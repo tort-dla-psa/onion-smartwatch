@@ -11,6 +11,7 @@
 #include "packet.h"
 #include "file.h"
 #include "socket_op.h"
+#include "debugger.h"
 
 template<typename T>
 using sptr = std::shared_ptr<T>;
@@ -19,23 +20,47 @@ using namespace IO;
 
 namespace watches{
 
+class packet_listener_client{
+	sptr<std::thread> thr;
+	sptr<IO::socket> sock;
+	sptr<debugger> dbg;
+	socket_op s_op;
+	bool connected;
+	int id;
+	void throw_ex(const std::string &header);
+	std::vector<packet> querry;
+	bool got_packets_flag;
+	void process_packets();
+public:
+	packet_listener_client(sptr<IO::socket> sock, int id);
+	~packet_listener_client();
+	std::vector<packet> get_querry();
+	bool got_packets()const;
+	int get_id()const;
+	void disconnect();
+	bool get_connected();
+};
+
 class packet_listener{
+	int max_clients;
+	bool quit_requested;
 	socket_op s_op;
 	sptr<IO::socket> sock;
+	sptr<debugger> dbg;
 	typedef void(*func)(const packet);
-	std::map<const packet, func>mp;
-	std::vector<sptr<IO::socket>> clients;
+	std::map<int, func>mp;
+	std::vector<sptr<packet_listener_client>> clients;
+	sptr<std::thread> accept_thread, reaction_thread;
 	std::mutex mt;
-	void accept_func();
-	void recv_func(sptr<IO::socket> cli);
-	void try_recv(sptr<IO::socket> cli, const int time);
+protected:
+	void reaction_func();
 	void throw_ex(const std::string &header);
+	void accept_client();
 public:
 	packet_listener(const std::string &path, const int max_clients);
 	~packet_listener();
-	void add_callback(const packet p,func f);
-	void try_accepting(const int time);
-	void spin(const int recv_time);
+	void add_callback(int code, func f);
+	void start();
 };
 
 }

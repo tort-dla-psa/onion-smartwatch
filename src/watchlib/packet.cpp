@@ -55,7 +55,6 @@ void packet::set_arg(const std::vector<std::string> &args){
 	this->args = args;
 }
 
-/*
 int packet::get_val()const{
 	return val;
 }
@@ -67,7 +66,7 @@ int packet::get_upid()const{
 }
 std::string packet::get_name()const{
 	return header[packet_name_place];
-}*/
+}
 std::vector<std::string> packet::get_args()const{
 	return args;
 }

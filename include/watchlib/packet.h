@@ -26,11 +26,10 @@ public:
 	void add_arg(const std::vector<std::string> &args);
 	void set_arg(const std::string &arg);
 	void set_arg(const std::vector<std::string> &args);
-/*	int get_val()const;
+	int get_val()const;
 	int get_pid()const;
 	int get_upid()const;
-	std::string get_name()const;*/
-//	std::vector<std::string> get_args()const;
+	std::string get_name()const;
 	std::vector<std::string> get_args()const;
 	std::string serialize()const;
 	bool operator == (const packet &rhs) const;
