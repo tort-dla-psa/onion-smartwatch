@@ -10,8 +10,9 @@ packet::packet(int val, int pid, int upid,
 	const std::vector<std::string> &args)
 {
 	this->val = val;
-	header[packet_pid_place] = pid;
-	header[packet_upid_place] = upid;
+	header = std::array<std::string, packet_header_size>();
+	header[packet_pid_place] = std::to_string(pid);
+	header[packet_upid_place] = std::to_string(upid);
 	header[packet_name_place] = name;
 	this->args = args;
 }
@@ -20,6 +21,7 @@ packet::packet(const std::string &data){
 	std::istringstream iss(data);
 	std::string token;
 	int count = 0;
+	header = std::array<std::string, packet_header_size>();
 	while (std::getline(iss, token, '|')){
 		if(count == 0){
 			val = std::stoi(token);

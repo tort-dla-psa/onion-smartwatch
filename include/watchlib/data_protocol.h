@@ -13,40 +13,52 @@ namespace data_protocol{
 		std::string &data)
 	{
 		int length;
-		data.clear();
+		if(!data.empty())
+			data.clear();
 		bool status = s_op->recv(sock, length);
-		if(!status){ return false; }
+		if(!status)
+			return false;
+		data.reserve(length);
 		status = s_op->recv(sock, data, length);
-		if(!status){ return false; }
+		if(!status)
+			return false;
 		return true;
 	}
 	inline bool recv(socket_op &s_op, sptr<IO::socket> sock,
 		std::string &data)
 	{
 		int length;
-		data.clear();
+		if(!data.empty())
+			data.clear();
 		bool status = s_op.recv(sock, length);
-		if(!status){ return false; }
+		data.reserve(length);
+		if(!status)
+			return false;
 		status = s_op.recv(sock, data, length);
-		if(!status){ return false; }
+		if(!status)
+			return false;
 		return true;
 	}
 	inline bool send(sptr<socket_op> &s_op, sptr<IO::socket> sock, 
 		const std::string &data)
 	{
-		bool status = s_op->send(sock, (int)data.length());
-		if(!status){ return false; }
+		bool status = s_op->send(sock, (int)data.size());
+		if(!status)
+			return false;
 		status = s_op->send(sock, data);
-		if(!status){ return false; }
+		if(!status)
+			return false;
 		return true;
 	}
 	inline bool send(socket_op &s_op, sptr<IO::socket> sock, 
 		const std::string &data)
 	{
-		bool status = s_op.send(sock, (int)data.length());
-		if(!status){ return false; }
+		bool status = s_op.send(sock, (int)data.size());
+		if(!status)
+			return false;
 		status = s_op.send(sock, data);
-		if(!status){ return false; }
+		if(!status)
+			return false;
 		return true;
 	}
 };

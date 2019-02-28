@@ -71,7 +71,6 @@ prepare:
 	mkdir -p $(blddir)/IO
 	mkdir -p $(libdir)
 	mkdir -p $(bindir)
-	echo $(test_dirs)
 
 $(IO):
 	$(MAKE) -C $(submodsdir)/UnixIO-cpp/ extra="$(extra)" all

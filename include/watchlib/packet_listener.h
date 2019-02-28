@@ -22,6 +22,7 @@ namespace watches{
 
 class packet_listener_client{
 	sptr<std::thread> thr;
+	std::mutex mt;
 	sptr<IO::socket> sock;
 	sptr<debugger> dbg;
 	socket_op s_op;
@@ -31,17 +32,19 @@ class packet_listener_client{
 	std::vector<packet> querry;
 	bool got_packets_flag;
 	void process_packets();
+	void print_dbg(const std::string &info, int verb);
 public:
 	packet_listener_client(sptr<IO::socket> sock, int id);
 	~packet_listener_client();
 	std::vector<packet> get_querry();
-	bool got_packets()const;
+	bool got_packets();
 	int get_id()const;
 	void disconnect();
 	bool get_connected();
 };
 
 class packet_listener{
+	std::mutex mt;
 	int max_clients;
 	bool quit_requested;
 	socket_op s_op;
@@ -51,7 +54,7 @@ class packet_listener{
 	std::map<int, func>mp;
 	std::vector<sptr<packet_listener_client>> clients;
 	sptr<std::thread> accept_thread, reaction_thread;
-	std::mutex mt;
+	void print_dbg(const std::string &info, int verb);
 protected:
 	void reaction_func();
 	void throw_ex(const std::string &header);

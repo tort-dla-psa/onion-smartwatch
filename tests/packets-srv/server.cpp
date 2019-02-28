@@ -17,10 +17,6 @@ void sigint_callback(int s){
 int main(){
 	signal(SIGINT, sigint_callback);
 	packet_listener l("socket", 1);
-	try{
-		l.add_callback(0, callback);
-	}catch(const std::exception &e){
-		std::cout<<e.what();
-	}
+	l.add_callback(0, callback);
 	l.start();
 }

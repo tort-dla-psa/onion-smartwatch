@@ -9,6 +9,7 @@
 #include "packet.h"
 #include "file.h"
 #include "socket_op.h"
+#include "debugger.h"
 
 template<typename T>
 using sptr = std::shared_ptr<T>;
@@ -20,6 +21,8 @@ class packet_sender{
 	socket_op s_op;
 	std::vector<sptr<IO::socket>> listeners;
 	void throw_ex(const std::string &header);
+	sptr<debugger> dbg;
+	void print_dbg(const std::string &info, int verb);
 public:
 	packet_sender();
 	~packet_sender();
