@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <map>
+#include <atomic>
 #include <thread>
 #include <mutex>
 
@@ -26,11 +27,10 @@ class packet_listener_client{
 	sptr<IO::socket> sock;
 	sptr<debugger> dbg;
 	socket_op s_op;
-	bool connected;
 	int id;
 	void throw_ex(const std::string &header);
 	std::vector<packet> querry;
-	bool got_packets_flag;
+	std::atomic<bool> connected, got_packets_flag;
 	void process_packets();
 	void print_dbg(const std::string &info, int verb);
 public:
@@ -46,24 +46,29 @@ public:
 class packet_listener{
 	std::mutex mt;
 	int max_clients;
-	bool quit_requested;
+	std::atomic<bool> quit_requested;
+	std::atomic<int> proc_sleep;
 	socket_op s_op;
 	sptr<IO::socket> sock;
 	sptr<debugger> dbg;
 	typedef void(*func)(const packet);
 	std::map<int, func>mp;
 	std::vector<sptr<packet_listener_client>> clients;
-	sptr<std::thread> accept_thread, reaction_thread;
+	sptr<std::thread> accept_thread, process_thread;
 	void print_dbg(const std::string &info, int verb);
 protected:
-	void reaction_func();
 	void throw_ex(const std::string &header);
-	void accept_client();
+	void accept_func();
+	void process_func();
 public:
-	packet_listener(const std::string &path, const int max_clients);
+	packet_listener(const std::string &path, const int max_clients,
+			const int proc_sleep);
 	~packet_listener();
 	void add_callback(int code, func f);
 	void start();
+	void stop();
+	int get_processing_sleep()const;
+	void change_processing_sleep(const int delta);
 };
 
 }

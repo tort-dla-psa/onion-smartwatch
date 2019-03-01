@@ -22,7 +22,7 @@ packet_listener_client::packet_listener_client(sptr<IO::socket> sock, int id){
 #ifdef DEBUG
 	dbg = debugger::get_instance();
 #endif
-	print_dbg("created packet_listener_client",0);
+	print_dbg("created",0);
 }
 void packet_listener_client::print_dbg(const std::string &info, int verb){
 	if(dbg) dbg->output(std::string("packet_listener_client[")+
@@ -33,15 +33,16 @@ void packet_listener_client::process_packets(){
 		print_dbg("recieving packet",0);
 		std::string data = "";
 		if(!data_protocol::recv(s_op, sock, data)){
-			print_dbg("can't recieve data on socket",2);
-			disconnect();
-			return;
+			print_dbg("can't recieve data on socket",0);
+			break;
 		}
 		print_dbg(std::string("got packet:")+data,0);
-		const packet p(data);
-		querry.emplace_back(p);
 		got_packets_flag = true;
+		mt.lock();
+		querry.emplace_back(data);
+		mt.unlock();
 	}
+	print_dbg("exit recieving thread loop",0);
 }
 packet_listener_client::~packet_listener_client(){
 	disconnect();
@@ -59,10 +60,7 @@ int packet_listener_client::get_id()const{
 	return id;
 }
 bool packet_listener_client::got_packets(){
-	mt.lock();
-	const bool bak = got_packets_flag;
-	mt.unlock();
-	return bak;
+	return got_packets_flag;
 }
 std::vector<packet> packet_listener_client::get_querry(){
 	mt.lock();
@@ -74,11 +72,12 @@ std::vector<packet> packet_listener_client::get_querry(){
 void packet_listener_client::disconnect(){
 	if(!connected)
 		return;
-	mt.lock();
 	connected = false;
-	print_dbg("disconnecting packet_listener_client",0);
+	print_dbg("disconnecting",0);
 	socket_op s_op;
+	mt.lock();
 	s_op.close(sock);
+	//s_op.shutdown(sock);
 	mt.unlock();
 }
 bool packet_listener_client::get_connected(){
@@ -86,11 +85,14 @@ bool packet_listener_client::get_connected(){
 }
 
 //============packet_listener==============//
-packet_listener::packet_listener(const std::string &path, int max_clients){
+packet_listener::packet_listener(const std::string &path, const int max_clients,
+		const int proc_sleep)
+{
 	quit_requested = false;
+	this->proc_sleep = proc_sleep;
 	sock = nullptr;
 	dbg = nullptr;
-	accept_thread = reaction_thread = nullptr;
+	accept_thread = process_thread = nullptr;
 #ifdef DEBUG
 	dbg = debugger::get_instance();
 #endif
@@ -109,6 +111,9 @@ packet_listener::packet_listener(const std::string &path, int max_clients){
 }
 packet_listener::~packet_listener(){
 	print_dbg(std::string("starting destruction:"), 0);
+	if(!quit_requested){
+		stop();
+	}
 	mt.lock();
 	for(sptr<packet_listener_client> &cl:clients){
 		print_dbg(std::string("forcing disconnection of client:") +
@@ -137,7 +142,7 @@ void packet_listener::add_callback(int code, func f){
 	mp[code] = f;
 	//TODO: retie if callback allready assigned
 }
-void packet_listener::accept_client(){
+void packet_listener::accept_func(){
 	print_dbg("starting accepting clients", 0);
 	int id = -1;
 	while(!quit_requested){
@@ -148,33 +153,38 @@ void packet_listener::accept_client(){
 			//TODO:refuse connection
 		}
 		if(!s){
+			if(quit_requested){
+				break;
+			}
 			throw_ex("Can't accept on socket");
 		}
 		id++;
 		print_dbg(std::string("got connection, ID=") + std::to_string(id) ,0);
 		mt.lock();
-		sptr<packet_listener_client> cli(new packet_listener_client(s, id));
-		clients.emplace_back(cli);
-		if(!reaction_thread){
-			reaction_thread = std::make_shared<std::thread>
-				(&packet_listener::reaction_func, this);
-		}
+		clients.emplace_back(new packet_listener_client(s, id));
 		mt.unlock();
 	}
 	print_dbg("finishing accepting clients", 0);
-	if(reaction_thread->joinable()){
-		reaction_thread->join();
-	}
 }
-void packet_listener::reaction_func(){
+void packet_listener::process_func(){
 	while(!quit_requested){
+		//sleep for CPU saving
+		std::this_thread::sleep_for(std::chrono::milliseconds(proc_sleep));
 		std::vector<packet> querry;
-		for(sptr<packet_listener_client> &cli:clients){
-			if(!cli->got_packets()){
-				continue;
+		mt.lock();
+		auto it = clients.begin();
+		while(it != clients.end()){
+			sptr<packet_listener_client> cli = (*it);
+			if(cli->got_packets()){
+				const std::vector<packet> packets = cli->get_querry();
+				querry.insert(querry.end(), packets.begin(), packets.end());
 			}
-			std::vector<packet> packets = cli->get_querry();
-			querry.insert(querry.end(), packets.begin(), packets.end());
+			if(!cli->get_connected()){
+				print_dbg(std::string("destroing client")+
+					std::to_string((*it)->get_id()),0);
+				it = clients.erase(it);
+			}
+			it++;
 		}
 		for(const packet &p:querry){
 			std::map<int, func>::iterator it = mp.find(p.get_val());
@@ -182,33 +192,34 @@ void packet_listener::reaction_func(){
 				(it->second)(p);
 			}
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		mt.unlock();
 	}
 }
 void packet_listener::start(){
-	print_dbg(std::string("starting main loop"), 0);
+	print_dbg(std::string("starting"), 0);
 	accept_thread = std::make_shared<std::thread>
-		(&packet_listener::accept_client, this);
-	while(!quit_requested){
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-		mt.lock();
-		auto it = clients.begin();
-		while(it != clients.end()){
-			if(!(*it)->get_connected()){
-				print_dbg(std::string("destroing client")+
-					std::to_string((*it)->get_id()),0);
-				it = clients.erase(it);
-				if(clients.size() == 0){
-					print_dbg("no clients, requesting finish", 0);
-					quit_requested = true;
-				}
-			}
-			else ++it;
-		}
-		mt.unlock();
-	}
+		(&packet_listener::accept_func, this);
+	process_thread = std::make_shared<std::thread>
+		(&packet_listener::process_func, this);
+}
+void packet_listener::stop(){
+	quit_requested = true;
+	print_dbg(std::string("stopping"), 0);
+	mt.lock();
+	s_op.shutdown(sock);
+	mt.unlock();
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	if(accept_thread->joinable()){
 		accept_thread->join();
 	}
-	print_dbg("finishing main loop", 0);
+	if(process_thread->joinable()){
+		process_thread->join();
+	}
+	print_dbg("stopped", 0);
+}
+int packet_listener::get_processing_sleep()const{
+	return proc_sleep;
+}
+void packet_listener::change_processing_sleep(const int delta){
+	proc_sleep += delta;
 }
