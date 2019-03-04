@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdexcept>
 #include <unistd.h>
 #include <fcntl.h>
 #include "watchlib.h"
@@ -12,17 +13,19 @@ const std::string lock_name = "update_lock";
 const std::string lock_path = watches_path+lock_name;
 const std::string lastpid_name = "lastpid";
 const std::string lastpid_path = watches_path + lastpid_name;
-#define sl_name "sl"
-#define ss_name "ss"
-
+const std::string p_lis_name = "p_lis";
 
 using namespace watches;
 using namespace IO;
 
-void print(const std::string &str){
-	std::cout<<str<<'\n';
-}
-watchlib::watchlib(){
+#ifdef DEBUG
+watchlib::watchlib():watchlib(debugger::get_instance()){}
+#else
+watchlib::watchlib():watchlib(nullptr){}
+#endif
+
+watchlib::watchlib(sptr<debugger> dbg){
+	this->dbg = dbg;
 	init_status = false;
 	app_pid = -1;
 	appform = nullptr;
@@ -33,106 +36,137 @@ watchlib::~watchlib(){
 		end();
 	}
 }
+void watchlib::throw_ex(const std::string &mes){
+	const std::string out_mes = std::string("watchlib: ")+mes+"\n";
+	throw std::runtime_error(out_mes);
+}
+void watchlib::print(const std::string &mes){
+	print(mes, 0);
+}
+void watchlib::print(const std::string &mes, int verb){
+	if(dbg) dbg->output("watchlib",mes, verb);
+}
 
-bool watchlib::init_dir(){
+void watchlib::init_dir(){
 	file_op f_op;
 	dir_op d_op;
 
 	sptr<file> lock_f = nullptr;
 	sptr<file> lastpid_f = nullptr;
 	sptr<dir> process_d = nullptr;
-	bool status = true;
 	std::string dirname;
 
 	{//check and create watches dir
-		status = d_op.check(watches_path);
-		if(!status)
-			status = (d_op.create(watches_path) != nullptr);
-		if(!status)
-			return status = false;
+		print(std::string("creating watches dir: ")+watches_path);
+		if(!d_op.check(watches_path))
+			d_op.create(watches_path);
 	}
 
-	while(f_op.check(lock_path)) //check lock
-		usleep(100000);
+	{
+		//TODO:change to subscription
+		bool lock_present = f_op.check(lock_path);
+		if(lock_present)
+			print(std::string("lock file exists at: ")+lock_path+", waiting");
+		while(f_op.check(lock_path)) //check lock
+			usleep(100000);
+	}
 
 	{//try to create lock file
+		print(std::string("creating lock file at: ")+lock_path);
 		lock_f = f_op.create(lock_path, O_RDONLY, 0644);
-		status &= (lock_f != nullptr);
-		status &= f_op.close(lock_f);
-		if(!status)
-			goto error_file;
+		f_op.close(lock_f);
 	}
 
 	{//open or try to create lastpid file
-		lastpid_f = f_op.open(lastpid_path, O_RDWR);
-		if(!lastpid_f){
+		if(f_op.check(lastpid_path)){
+			print(std::string("opening lastpid file at: ")+lastpid_path);
+			lastpid_f = f_op.open(lastpid_path, O_RDWR);
+		}else{
+			print(std::string("creating lastpid file at: ")+lastpid_path);
 			lastpid_f = f_op.create(lastpid_path, O_RDWR, 0644);
-			status &= (lastpid_f != nullptr);
-			if(!status)
-				goto error_file;
 		}
 	}
 
-	{//read last pid
-		int last = 0;
-		std::string ch_last = f_op.read(lastpid_f);
-		last = (ch_last != "")? std::atoi(ch_last.c_str()) : 0;
-		dirname = std::to_string(last+1);
+	{//read last pid and calculate new pid
+		int last = -1;
+		std::string str_last;
+		print(std::string("reading last pid from: ")+lastpid_path);
+		f_op.read(lastpid_f, str_last);
+		if(!str_last.empty())
+			last = std::atoi(str_last.c_str());
 		this->app_pid = last+1;
+		dirname = std::to_string(app_pid);
 	}
 
-	status &= f_op.clear(lastpid_f);
-       	status &= f_op.write(lastpid_f, dirname);
-	status &= f_op.close(lastpid_f);
-	if(!status)
-		goto error_file;
+	f_op.clear(lastpid_f);
+       	f_op.write(lastpid_f, dirname);
+	f_op.close(lastpid_f);
 
+	//creating dir for appication
 	dirname = std::string(watches_path) + dirname;
+	print(std::string("creating dir at: ")+dirname);
 	process_d = d_op.create(dirname);
-	if(!process_d){ return status = false; }
-
-	status &= f_op.remove(lock_f);
-	if(!status)
-		goto error_file;
-	return true;
-error_file:
-	print(f_op.get_errmes());
-	return false;
+	
+	print("unlocking pids dir");
+	f_op.remove(lock_f);
 }
-bool watchlib::init(){
+
+void watchlib::init_ipc(){
+	const int max_cli = 10;
+	const int proc_sleep = 1000;
+	const std::string p_lis_path = std::string(watches_path) + 
+		std::to_string(app_pid) + "/" + p_lis_name;
+	p_lis = std::make_unique<packet_listener>
+		(p_lis_path, max_cli, proc_sleep);
+	p_lis->start();
+	p_send = std::make_unique<packet_sender>();
+}
+
+void watchlib::init(){
+	try{
+		init_dir();
+		init_ipc();
+	}catch(const std::runtime_error &e){
+		std::cerr<<e.what();
+		return;
+	}
 	init_status = true;
-	init_status &= init_dir();
-	if(!init_status)
-		return false;
-	return true;
 }
 
-bool watchlib::end(){
-	//TODO:delete sl and ss
+void watchlib::end(){
+	print("ending");
+	print("stopping IPC");
+	p_lis->stop();
+	p_lis.reset(nullptr);
+	p_send.reset(nullptr);
 
 	dir_op d_op;
 	file_op f_op;
 
 	const std::string dirpath = std::string(watches_path) +
 		std::to_string(this->app_pid);
+	print(std::string("recursively removing app's dir:")+dirpath);
 	sptr<dir> d = d_op.open(dirpath);
-	if(!d_op.remove(d))
-		return false;
-
-	init_status = false;
+	d_op.remove(d);
 
 	d = d_op.open(watches_path);
 	int files = d_op.count_files(d)-2;
 	if(files == 1 && f_op.check(lastpid_path)){
+		print("cleaning watches dir");
 		d_op.remove(d);
 	}
-	return true;
+	init_status = false;
 }
 
-void watchlib::set_form(const sptr<binform> &appform){
+void watchlib::set_form(sptr<binform> appform){
 	this->appform = appform;
 }
 
 sptr<binform> watchlib::get_form()const{
 	return appform;
+}
+void watchlib::add_callback(int code, func f){
+	if(!init_status)
+		throw_ex("library was not initialized");
+	p_lis->add_callback(code, f);
 }
