@@ -32,7 +32,9 @@ void packet_listener_client::process_packets(){
 	while(connected){
 		print_dbg("recieving packet",0);
 		std::string data = "";
-		if(!data_protocol::recv(s_op, sock, data)){
+		try{
+			data_protocol::recv(s_op, sock, data);
+		}catch(...){
 			print_dbg("can't recieve data on socket",0);
 			break;
 		}
@@ -52,8 +54,7 @@ packet_listener_client::~packet_listener_client(){
 	}
 }
 void packet_listener_client::throw_ex(const std::string &header){
-	std::string mes = std::string("Packet_listener_client: ")+
-		header+(":\n\t") + s_op.get_errmes();
+	std::string mes = std::string("Packet_listener_client: ")+ header;
 	throw std::runtime_error(mes);
 }
 int packet_listener_client::get_id()const{
@@ -98,44 +99,29 @@ packet_listener::packet_listener(const std::string &path, const int max_clients,
 #endif
 	print_dbg(std::string("creating socket at:")+path, 0);
 	sock = s_op.create(path, AF_UNIX, SOCK_STREAM);
-	if(!sock){
-		throw_ex(std::string("Can't create socket at ")+path);
-	}
-	if(!s_op.bind(sock)){
-		throw_ex(std::string("Can't bind socket at ")+path);
-	}
-	if(!s_op.listen(sock, max_clients)){
-		throw_ex(std::string("Can't listen on socket at ")+path);
-	}
+	s_op.bind(sock);
+	s_op.listen(sock, max_clients);
 	print_dbg(std::string("creating socket at:")+path+" done", 0);
 }
 packet_listener::~packet_listener(){
 	print_dbg(std::string("starting destruction:"), 0);
 	if(!quit_requested){
+		print_dbg(std::string("I was not stopper, stopping now"), 0);
 		stop();
 	}
-	mt.lock();
-	for(sptr<packet_listener_client> &cl:clients){
-		print_dbg(std::string("forcing disconnection of client:") +
-			std::to_string(cl->get_id()), 0);
-		cl->disconnect();
-	}
-	clients.clear();
-	if(sock && !s_op.close(sock)){
-		throw_ex(std::string("Can't close socket at ")+sock->get_path());
-	}
+
+	print_dbg(std::string("removing socket file"), 0);
 	file_op f_op;
-	if(sock && !f_op.remove(sock)){
-		throw_ex(std::string("Can't unlink socket at ")+sock->get_path());
-	}
+	f_op.remove(sock);
+	//throw_ex(std::string("Can't close socket at ")+sock->get_path());
+	//throw_ex(std::string("Can't unlink socket at ")+sock->get_path());
 	mt.unlock();
 }
 void packet_listener::print_dbg(const std::string &info, int verb){
 	if(dbg) dbg->output("packet_listener", info, verb);
 }
 void packet_listener::throw_ex(const std::string &header){
-	std::string mes = std::string("Packet_listener: ")+
-		header+(":\n\t") + s_op.get_errmes();
+	std::string mes = std::string("packet_listener: ")+ header;
 	throw std::runtime_error(mes);
 }
 void packet_listener::add_callback(int code, func f){
@@ -146,17 +132,17 @@ void packet_listener::accept_func(){
 	print_dbg("starting accepting clients", 0);
 	int id = -1;
 	while(!quit_requested){
-		sptr<IO::socket> s = s_op.accept(sock);
+		sptr<IO::socket> s = nullptr; 
+		try{
+			s = s_op.accept(sock);
+		}catch(const std::runtime_error &e){
+			print_dbg("invalid argument exception on accepting thread, finishing it", 0);
+			break;
+		}
 		if(clients.size() >= max_clients){
 			print_dbg("can't accept more clients",0);
+			s_op.close(s);
 			continue;
-			//TODO:refuse connection
-		}
-		if(!s){
-			if(quit_requested){
-				break;
-			}
-			throw_ex("Can't accept on socket");
 		}
 		id++;
 		print_dbg(std::string("got connection, ID=") + std::to_string(id) ,0);
@@ -205,16 +191,31 @@ void packet_listener::start(){
 void packet_listener::stop(){
 	quit_requested = true;
 	print_dbg(std::string("stopping"), 0);
+
 	mt.lock();
+	print_dbg(std::string("shutting socket down"), 0);
 	s_op.shutdown(sock);
 	mt.unlock();
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
 	if(accept_thread->joinable()){
 		accept_thread->join();
 	}
 	if(process_thread->joinable()){
 		process_thread->join();
 	}
+
+	print_dbg(std::string("disconnecting clients"), 0);
+	mt.lock();
+	for(sptr<packet_listener_client> &cl:clients){
+		print_dbg(std::string("forcing disconnection of client:") +
+			std::to_string(cl->get_id()), 0);
+		cl->disconnect();
+	}
+	clients.clear();
+	print_dbg(std::string("closing socket"), 0);
+	s_op.close(sock);
+	mt.unlock();
 	print_dbg("stopped", 0);
 }
 int packet_listener::get_processing_sleep()const{

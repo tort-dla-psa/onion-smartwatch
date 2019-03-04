@@ -15,6 +15,7 @@ packet_sender::packet_sender(){
 packet_sender::~packet_sender(){
 	print_dbg("disconnecting and destructing", 0);
 	for(sptr<IO::socket> &sock:listeners){
+		print_dbg(std::string("disconnecting from ")+sock->get_path(), 0);
 		s_op.close(sock);
 	}
 	listeners.clear();
@@ -23,23 +24,17 @@ void packet_sender::print_dbg(const std::string &info, int verb){
 	if(dbg) dbg->output("packet_sender", info, verb);
 }
 void packet_sender::throw_ex(const std::string &header){
-	std::string mes = std::string("Packet_sender: ")+
-		header+(":\n\t") + s_op.get_errmes();
+	std::string mes = std::string("packet_sender: ")+ header;
 	throw std::runtime_error(mes);
 }
 void packet_sender::connect(const std::string &path){
 	print_dbg(std::string("connecting to:")+path, 0);
 	for(const sptr<IO::socket> &sock:listeners){
 		if(sock->get_path() == path)
-			throw_ex(std::string("Socket ")+path+(" allready connected"));
+			throw_ex(std::string("socket at:")+path+(" allready connected"));
 	}
 	sptr<IO::socket> sock = s_op.create(path, AF_UNIX, SOCK_STREAM);
-	if(!sock){
-		throw_ex("Can't create AF_UNIX socket");
-	}
-	if(!s_op.connect(sock)){
-		throw_ex(std::string("Can't connect to ")+path);
-	}
+	s_op.connect(sock);
 	listeners.emplace_back(sock);
 }
 void packet_sender::send(const std::string &path, const packet p){
@@ -47,10 +42,7 @@ void packet_sender::send(const std::string &path, const packet p){
 	print_dbg(std::string("sending packet:")+data+" to:"+path, 0);
 	for(const sptr<IO::socket> &sock:listeners){
 		if(sock->get_path() == path){
-			if(!data_protocol::send(s_op, sock, data)){
-				throw_ex(std::string("can't send to:")+path+
-						", "+s_op.get_errmes());
-			}
+			data_protocol::send(s_op, sock, data);
 			return;
 		}
 	}

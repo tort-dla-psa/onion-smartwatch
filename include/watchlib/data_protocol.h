@@ -9,57 +9,37 @@ using namespace IO;
 
 namespace watches{
 namespace data_protocol{
-	inline bool recv(sptr<socket_op> &s_op, sptr<IO::socket> sock,
+	inline void recv(sptr<socket_op> &s_op, sptr<IO::socket> sock,
 		std::string &data)
 	{
 		int length;
 		if(!data.empty())
 			data.clear();
-		bool status = s_op->recv(sock, length);
-		if(!status)
-			return false;
+		s_op->recv(sock, length);
 		data.reserve(length);
-		status = s_op->recv(sock, data, length);
-		if(!status)
-			return false;
-		return true;
+		s_op->recv(sock, data, length);
 	}
-	inline bool recv(socket_op &s_op, sptr<IO::socket> sock,
+	inline void recv(socket_op &s_op, sptr<IO::socket> sock,
 		std::string &data)
 	{
 		int length;
 		if(!data.empty())
 			data.clear();
-		bool status = s_op.recv(sock, length);
+		s_op.recv(sock, length);
 		data.reserve(length);
-		if(!status)
-			return false;
-		status = s_op.recv(sock, data, length);
-		if(!status)
-			return false;
-		return true;
+		s_op.recv(sock, data, length);
 	}
-	inline bool send(sptr<socket_op> &s_op, sptr<IO::socket> sock, 
+	inline void send(sptr<socket_op> &s_op, sptr<IO::socket> sock, 
 		const std::string &data)
 	{
-		bool status = s_op->send(sock, (int)data.size());
-		if(!status)
-			return false;
-		status = s_op->send(sock, data);
-		if(!status)
-			return false;
-		return true;
+		s_op->send(sock, (int)data.size());
+		s_op->send(sock, data);
 	}
-	inline bool send(socket_op &s_op, sptr<IO::socket> sock, 
+	inline void send(socket_op &s_op, sptr<IO::socket> sock, 
 		const std::string &data)
 	{
-		bool status = s_op.send(sock, (int)data.size());
-		if(!status)
-			return false;
-		status = s_op.send(sock, data);
-		if(!status)
-			return false;
-		return true;
+		s_op.send(sock, (int)data.size());
+		s_op.send(sock, data);
 	}
 };
 };
