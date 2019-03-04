@@ -5,8 +5,10 @@
 #include "imagebox.h"
 #include "watchlib.h"
 
-#define app_w 128
-#define app_h 64
+#define app_w 70
+#define app_h 10
+
+using namespace watches;
 
 inline void draw_img(image* img){
 	const unsigned int w = img->get_w();
@@ -32,20 +34,10 @@ public:
 };
 
 int main(){
-	myform form(app_w, app_h);
-/*
-	sptr<v_stack> st1(new v_stack());
-	sptr<label> lbl1(new label("lbl1"));
-	sptr<label> lbl2(new label("lbl2"));
-	sptr<label> lbl3(new label("label3"));
-	st1->add_element(lbl1);
-	st1->add_element(lbl2);
-	st1->add_element(lbl3);
-	st1->update();
-	//draw_img(st1->get_image().get());
-	form.add_element(st1);
-	form.update();
-	form.draw();
-*/
-//	sptr<imagebox>
+	sptr<myform> form(new myform(app_w, app_h));
+	watchlib lib_obj;
+	lib_obj.init();
+	lib_obj.set_form(form);
+	//simulating some work
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
