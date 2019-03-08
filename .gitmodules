@@ -1,3 +1,6 @@
 [submodule "submodules/UnixIO-cpp"]
 	path = submodules/UnixIO-cpp
 	url = https://github.com/tort-dla-psa/UnixIO-cpp
+[submodule "submodules/binforms"]
+	path = submodules/binforms
+	url = https://github.com/tort-dla-psa/binforms
