@@ -5,7 +5,7 @@ using namespace watches;
 
 const std::string reg_delimiter = "|";
 
-packet::packet(int val, int pid, int upid,
+packet::packet(API_CALL val, int pid, int upid,
 	const std::string &name,
 	const std::vector<std::string> &args)
 {
@@ -24,7 +24,7 @@ packet::packet(const std::string &data){
 	header = std::array<std::string, packet_header_size>();
 	while (std::getline(iss, token, '|')){
 		if(count == 0){
-			val = std::stoi(token);
+			val = static_cast<API_CALL>(std::stoi(token));
 		}else if(count < packet_header_size + 1){
 			header[count - 1] = token;
 		}else{
@@ -34,7 +34,7 @@ packet::packet(const std::string &data){
 	}
 }
 
-packet::packet(int val, const std::array<std::string, packet_header_size> &header){
+packet::packet(API_CALL val, const std::array<std::string, packet_header_size> &header){
 	this->val = val;
 	this->header = header;
 }
@@ -57,7 +57,7 @@ void packet::set_arg(const std::vector<std::string> &args){
 	this->args = args;
 }
 
-int packet::get_val()const{
+API_CALL packet::get_val()const{
 	return val;
 }
 int packet::get_pid()const{
@@ -74,7 +74,7 @@ std::vector<std::string> packet::get_args()const{
 }
 
 std::string packet::serialize()const{
-	std::string data = std::to_string(val);
+	std::string data = std::to_string(static_cast<int>(val));
 	data.append(reg_delimiter);
 	for(const std::string &tmp_str:header){
 		data.append(tmp_str);

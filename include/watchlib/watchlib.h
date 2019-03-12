@@ -2,6 +2,7 @@
 #define watchlib_h
 
 #include <memory>
+#include "API_CALLS.h"
 #include "binform.h"
 #include "packet_listener.h"
 #include "packet_sender.h"
@@ -14,10 +15,6 @@ template<typename T>
 using uptr = std::unique_ptr<T>;
 
 namespace watches{
-
-enum class API_CALLS{
-	ask_info = 0,
-};
 
 class watchlib{
 private:
@@ -44,7 +41,7 @@ public:
 
 	void set_form(sptr<binform> form);
 	sptr<binform> get_form()const;
-	void add_callback(int code, func f);
+	void add_callback(API_CALL code, func f);
 };
 
 };

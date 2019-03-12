@@ -9,6 +9,7 @@
 #include <thread>
 #include <mutex>
 
+#include "API_CALLS.h"
 #include "packet.h"
 #include "file.h"
 #include "socket_op.h"
@@ -52,7 +53,7 @@ class packet_listener{
 	sptr<IO::socket> sock;
 	sptr<debugger> dbg;
 	typedef void(*func)(const packet);
-	std::map<int, func>mp;
+	std::map<API_CALL, func>mp;
 	std::vector<sptr<packet_listener_client>> clients;
 	sptr<std::thread> accept_thread, process_thread;
 	void print_dbg(const std::string &info, int verb);
@@ -64,7 +65,7 @@ public:
 	packet_listener(const std::string &path, const int max_clients,
 			const int proc_sleep);
 	~packet_listener();
-	void add_callback(int code, func f);
+	void add_callback(API_CALL code, func f);
 	void start();
 	void stop();
 	int get_processing_sleep()const;

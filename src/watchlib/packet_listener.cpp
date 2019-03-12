@@ -124,7 +124,7 @@ void packet_listener::throw_ex(const std::string &header){
 	std::string mes = std::string("packet_listener: ")+ header;
 	throw std::runtime_error(mes);
 }
-void packet_listener::add_callback(int code, func f){
+void packet_listener::add_callback(API_CALL code, func f){
 	mp[code] = f;
 	//TODO: retie if callback allready assigned
 }
@@ -173,7 +173,8 @@ void packet_listener::process_func(){
 			it++;
 		}
 		for(const packet &p:querry){
-			std::map<int, func>::iterator it = mp.find(p.get_val());
+			std::map<API_CALL, func>::iterator it = 
+				mp.find(p.get_val());
 			if(it != mp.end()){
 				(it->second)(p);
 			}

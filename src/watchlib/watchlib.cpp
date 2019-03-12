@@ -62,8 +62,7 @@ void watchlib::init_dir(){
 			d_op.create(watches_path);
 	}
 
-	{
-		//TODO:change to subscription
+	{//TODO:change to subscription
 		bool lock_present = f_op.check(lock_path);
 		if(lock_present)
 			print(std::string("lock file exists at: ")+lock_path+", waiting");
@@ -165,7 +164,7 @@ void watchlib::set_form(sptr<binform> appform){
 sptr<binform> watchlib::get_form()const{
 	return appform;
 }
-void watchlib::add_callback(int code, func f){
+void watchlib::add_callback(API_CALL code, func f){
 	if(!init_status)
 		throw_ex("library was not initialized");
 	p_lis->add_callback(code, f);
