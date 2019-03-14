@@ -20,7 +20,7 @@ dbgr := debugger
 dbgr_flags := -c -fPIC
 dbgr_s := $(srcdir)/$(dbgr)/*.cpp
 dbgr_h := $(incdir)/$(dbgr)
-dbgr_inc := $(dbgr_h)
+dbgr_inc := -I$(dbgr_h)
 dbgr_files := $(dbgr_s) $(dbgr_h)/*.h
 dbgr_trg := $(blddir)/$(dbgr).o
 dbgr_dep := 
@@ -40,13 +40,33 @@ libwatches_dep := $(dbgr_trg) $(IO) $(binforms)
 
 #interface
 app_ui := interface
-app_ui_flags := $(libwatches_trg) ./$(submodsdir)/binforms/lib/*.so
+app_ui_flags := $(libwatches_trg) ./$(submodsdir)/binforms/lib/*.so -lpthread
 app_ui_s := $(appsdir)/$(app_ui)/*.cpp
 app_ui_h := $(appsdir)/$(app_ui) 
 app_ui_files := $(app_ui_s) #$(appsdir)/$(app_ui)/*.h
 app_ui_inc := -I$(app_ui_h) $(libwatches_inc)
 app_ui_trg := $(bindir)/$(app_ui)/$(app_ui)
 app_ui_dep := $(libwatches_trg)
+
+#companion-server
+companion_serv := companion-server
+companion_serv_flags := $(libwatches_trg)
+companion_serv_s := $(appsdir)/$(companion_serv)/*.cpp
+companion_serv_h := $(appsdir)/$(companion_serv)
+companion_serv_files := $(companion_serv_s)
+companion_serv_inc := -I$(companion_serv_h) $(libwatches_inc)
+companion_serv_trg := $(bindir)/$(companion_serv)/$(companion_serv)
+companion_serv_dep := $(IO) $(libwatches_trg)
+
+#client-mock
+cli_mock := interface-client
+cli_mock_flags :=
+cli_mock_s := $(appsdir)/$(cli_mock)/*.cpp
+cli_mock_h := $(appsdir)/$(cli_mock) 
+cli_mock_files := $(cli_mock_s) #$(appsdir)/$(app_ui)/*.h
+cli_mock_inc := -I$(cli_mock_h) $(libwatches_inc)
+cli_mock_trg := $(bindir)/$(cli_mock)/$(cli_mock)
+cli_mock_dep := $(IO)
 
 #hello-world
 app_hello := hello-world
@@ -79,25 +99,41 @@ $(dbgr_trg): $(dbgr_files) $(dbgr_dep)
 $(libwatches_trg): $(libwatches_files) $(libwatches_dep)
 	$(cxx) $(cxxflags) $(libwatches_s) $(libwatches_inc) $(libwatches_flags) -o $@
 
-$(app_ui_trg): $(app_ui_files)
+$(app_ui_trg): $(app_ui_files) $(app_ui_dep)
 	mkdir -p $(bindir)/$(app_ui)
 	$(cxx) $(cxxflags) $(app_ui_s) $(app_ui_inc) \
 		$(submodsdir)/UnixIO-cpp/build/* \
 		$(dbgr_trg) \
 		$(app_ui_flags) -o $@
 
-$(app_hello_trg): $(app_hello_files)
+$(companion_serv_trg): $(companion_serv_files) $(companion_serv_dep)
+	mkdir -p $(bindir)/$(companion_serv)
+	$(cxx) $(cxxflags) $(companion_serv_s) $(companion_serv_inc) \
+		$(submodsdir)/UnixIO-cpp/build/* \
+		$(dbgr_trg) \
+		$(companion_serv_flags) -o $@
+
+$(app_hello_trg): $(app_hello_files) $(app_hello_dep)
 	mkdir -p $(bindir)/$(app_hello)
 	$(cxx) $(cxxflags) $(app_hello_s) $(app_hello_inc) \
 		$(submodsdir)/UnixIO-cpp/build/* \
 		$(dbgr_trg) \
 	       	$(app_hello_flags) -o $(app_hello_trg)
 
+$(cli_mock_trg): $(cli_mock_files) $(cli_mock_dep)
+	mkdir -p $(bindir)/$(cli_mock)
+	$(cxx) $(cxxflags) $(cli_mock_s) $(cli_mock_inc) \
+		$(srcdir)/$(libwatches)/packet.cpp \
+		$(submodsdir)/UnixIO-cpp/build/* \
+	       	$(cli_mock_flags) -o $(cli_mock_trg)
+
 $(libwatches): $(libwatches_trg)
 $(app_ui): $(app_ui_trg)
 $(app_hello): $(app_hello_trg)
+$(cli_mock): $(cli_mock_trg)
+$(companion_serv): $(companion_serv_trg)
 
-all: prepare $(libwatches) $(app_ui) $(app_hello) $(IO) $(binforms)
+all: prepare $(app_ui) $(cli_mock) $(companion_serv) $(app_hello) 
 
 clean:
 	rm -rf $(blddir) $(libdir) $(bindir)
