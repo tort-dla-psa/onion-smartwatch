@@ -17,12 +17,12 @@ using uptr = std::unique_ptr<T>;
 namespace watches{
 
 class watchlib{
-private:
+protected:
 	sptr<binform> appform;
 	sptr<debugger> dbg;
 	uptr<packet_listener> p_lis;
 	uptr<packet_sender> p_send;
-	int app_pid;
+	int app_pid, unix_pid;
 	bool init_status;
 	typedef void(*func)(const packet);
 
@@ -42,6 +42,9 @@ public:
 	void set_form(sptr<binform> form);
 	sptr<binform> get_form()const;
 	void add_callback(API_CALL code, func f);
+	void send(const int pid, API_CALL code, const std::vector<std::string> &args);
+	void send(const std::string &name, API_CALL code,
+			const std::vector<std::string> &args);
 };
 
 };

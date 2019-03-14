@@ -169,3 +169,12 @@ void watchlib::add_callback(API_CALL code, func f){
 		throw_ex("library was not initialized");
 	p_lis->add_callback(code, f);
 }
+void watchlib::send(const int pid, API_CALL code, const std::vector<std::string> &args){
+	p_send->connect(watches_path + std::to_string(pid));
+	const packet p(code, app_pid, unix_pid, "name", std::move(args));
+	p_send->send(watches_path + std::to_string(pid), std::move(p));
+}
+void watchlib::send(const std::string &name, API_CALL code,
+		const std::vector<std::string> &args)
+{
+}
