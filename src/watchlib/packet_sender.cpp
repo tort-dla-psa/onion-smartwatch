@@ -8,7 +8,7 @@ using namespace watches;
 packet_sender::packet_sender(){
 	dbg = nullptr;
 #ifdef DEBUG
-	dbg = debugger::get_instance();
+	dbg = logger::get_instance();
 #endif
 	print_dbg("created", 0);
 }

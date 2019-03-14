@@ -7,7 +7,7 @@
 #include "packet_listener.h"
 #include "packet_sender.h"
 #include "packet.h"
-#include "debugger.h"
+#include "logger.h"
 
 template<typename T>
 using sptr = std::shared_ptr<T>;
@@ -19,7 +19,7 @@ namespace watches{
 class watchlib{
 protected:
 	sptr<binform> appform;
-	sptr<debugger> dbg;
+	sptr<logger> dbg;
 	uptr<packet_listener> p_lis;
 	uptr<packet_sender> p_send;
 	int app_pid, unix_pid;
@@ -31,7 +31,7 @@ protected:
 	void throw_ex(const std::string &mes);
 	void print(const std::string &mes, int verb);
 	void print(const std::string &mes);
-	watchlib(sptr<debugger> dbg);
+	watchlib(sptr<logger> dbg);
 public:
 	watchlib();
 	~watchlib();

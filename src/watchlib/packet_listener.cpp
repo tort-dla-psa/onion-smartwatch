@@ -20,7 +20,7 @@ packet_listener_client::packet_listener_client(sptr<IO::socket> sock, int id){
 	this->thr = std::make_shared<std::thread>
 		(&packet_listener_client::process_packets, this);
 #ifdef DEBUG
-	dbg = debugger::get_instance();
+	dbg = logger::get_instance();
 #endif
 	print_dbg("created",0);
 }
@@ -95,7 +95,7 @@ packet_listener::packet_listener(const std::string &path, const int max_clients,
 	dbg = nullptr;
 	accept_thread = process_thread = nullptr;
 #ifdef DEBUG
-	dbg = debugger::get_instance();
+	dbg = logger::get_instance();
 #endif
 	print_dbg(std::string("creating socket at:")+path, 0);
 	sock = s_op.create(path, AF_UNIX, SOCK_STREAM);

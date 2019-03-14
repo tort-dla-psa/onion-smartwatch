@@ -13,7 +13,7 @@
 #include "packet.h"
 #include "file.h"
 #include "socket_op.h"
-#include "debugger.h"
+#include "logger.h"
 
 template<typename T>
 using sptr = std::shared_ptr<T>;
@@ -26,7 +26,7 @@ class packet_listener_client{
 	sptr<std::thread> thr;
 	std::mutex mt;
 	sptr<IO::socket> sock;
-	sptr<debugger> dbg;
+	sptr<logger> dbg;
 	socket_op s_op;
 	int id;
 	void throw_ex(const std::string &header);
@@ -51,7 +51,7 @@ class packet_listener{
 	std::atomic<int> proc_sleep;
 	socket_op s_op;
 	sptr<IO::socket> sock;
-	sptr<debugger> dbg;
+	sptr<logger> dbg;
 	typedef void(*func)(const packet);
 	std::map<API_CALL, func>mp;
 	std::vector<sptr<packet_listener_client>> clients;

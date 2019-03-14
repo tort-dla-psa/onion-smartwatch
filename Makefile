@@ -15,15 +15,15 @@ IO:= $(blddir)/IO.flag
 #binforms submodule
 binforms:= $(blddir)/binforms.flag
 
-#debugger
-dbgr := debugger
-dbgr_flags := -c -fPIC
-dbgr_s := $(srcdir)/$(dbgr)/*.cpp
-dbgr_h := $(incdir)/$(dbgr)
-dbgr_inc := -I$(dbgr_h)
-dbgr_files := $(dbgr_s) $(dbgr_h)/*.h
-dbgr_trg := $(blddir)/$(dbgr).o
-dbgr_dep := 
+#logger
+lggr := logger
+lggr_flags := -c -fPIC
+lggr_s := $(srcdir)/$(lggr)/*.cpp
+lggr_h := $(incdir)/$(lggr)
+lggr_inc := -I$(lggr_h)
+lggr_files := $(lggr_s) $(lggr_h)/*.h
+lggr_trg := $(blddir)/$(lggr).o
+lggr_dep := 
 
 #libwatches
 libwatches := watchlib
@@ -32,11 +32,11 @@ libwatches_s := $(srcdir)/$(libwatches)/*.cpp
 libwatches_h := $(incdir)/$(libwatches)
 libwatches_files := $(libwatches_s) $(libwatches_h)/*.h
 libwatches_inc := -I$(libwatches_h) \
-		-I$(dbgr_h) \
+		-I$(lggr_h) \
 		-I$(submodsdir)/UnixIO-cpp/include/ \
 		-I$(submodsdir)/binforms/include/
 libwatches_trg := $(libdir)/$(libwatches).so
-libwatches_dep := $(dbgr_trg) $(IO) $(binforms)
+libwatches_dep := $(lggr_trg) $(IO) $(binforms)
 
 #interface
 app_ui := interface
@@ -93,8 +93,8 @@ $(binforms):
 	$(MAKE) -C $(submodsdir)/binforms/ extra="$(extra)" all
 	touch $(@)
 
-$(dbgr_trg): $(dbgr_files) $(dbgr_dep)
-	$(cxx) $(cxxflags) $(dbgr_s) $(dbgr_inc) $(dbgr_flags) -o $@
+$(lggr_trg): $(lggr_files) $(lggr_dep)
+	$(cxx) $(cxxflags) $(lggr_s) $(lggr_inc) $(lggr_flags) -o $@
 
 $(libwatches_trg): $(libwatches_files) $(libwatches_dep)
 	$(cxx) $(cxxflags) $(libwatches_s) $(libwatches_inc) $(libwatches_flags) -o $@
@@ -103,21 +103,21 @@ $(app_ui_trg): $(app_ui_files) $(app_ui_dep)
 	mkdir -p $(bindir)/$(app_ui)
 	$(cxx) $(cxxflags) $(app_ui_s) $(app_ui_inc) \
 		$(submodsdir)/UnixIO-cpp/build/* \
-		$(dbgr_trg) \
+		$(lggr_trg) \
 		$(app_ui_flags) -o $@
 
 $(companion_serv_trg): $(companion_serv_files) $(companion_serv_dep)
 	mkdir -p $(bindir)/$(companion_serv)
 	$(cxx) $(cxxflags) $(companion_serv_s) $(companion_serv_inc) \
 		$(submodsdir)/UnixIO-cpp/build/* \
-		$(dbgr_trg) \
+		$(lggr_trg) \
 		$(companion_serv_flags) -o $@
 
 $(app_hello_trg): $(app_hello_files) $(app_hello_dep)
 	mkdir -p $(bindir)/$(app_hello)
 	$(cxx) $(cxxflags) $(app_hello_s) $(app_hello_inc) \
 		$(submodsdir)/UnixIO-cpp/build/* \
-		$(dbgr_trg) \
+		$(lggr_trg) \
 	       	$(app_hello_flags) -o $(app_hello_trg)
 
 $(cli_mock_trg): $(cli_mock_files) $(cli_mock_dep)

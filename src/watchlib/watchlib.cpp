@@ -19,12 +19,12 @@ using namespace watches;
 using namespace IO;
 
 #ifdef DEBUG
-watchlib::watchlib():watchlib(debugger::get_instance()){}
+watchlib::watchlib():watchlib(logger::get_instance()){}
 #else
 watchlib::watchlib():watchlib(nullptr){}
 #endif
 
-watchlib::watchlib(sptr<debugger> dbg){
+watchlib::watchlib(sptr<logger> dbg){
 	this->dbg = dbg;
 	init_status = false;
 	app_pid = -1;
