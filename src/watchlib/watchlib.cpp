@@ -170,9 +170,11 @@ void watchlib::add_callback(API_CALL code, func f){
 	p_lis->add_callback(code, f);
 }
 void watchlib::send(const int pid, API_CALL code, const std::vector<std::string> &args){
-	p_send->connect(watches_path + std::to_string(pid));
+	const std::string path = watches_path + std::to_string(pid) + "/" + p_lis_name;
+	if(!p_send->is_connected(path))
+		p_send->connect(path);
 	const packet p(code, app_pid, unix_pid, "name", std::move(args));
-	p_send->send(watches_path + std::to_string(pid), std::move(p));
+	p_send->send(path, std::move(p));
 }
 void watchlib::send(const std::string &name, API_CALL code,
 		const std::vector<std::string> &args)

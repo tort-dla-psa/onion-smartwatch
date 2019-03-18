@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
+#include <stdexcept>
 #include "API_CALLS.h"
 #include "data_protocol.h"
 #include "stat_op.h"
@@ -24,6 +26,11 @@ using namespace watches;
 const std::string watches_path("/home/tort/gits/onion-smartwatch/");
 
 std::vector<sptr<std::thread>> children;
+
+void throw_ex(const std::string &mes){
+	const std::string fullmes = "interface: exception: " + mes + "\n";
+	throw std::runtime_error(fullmes);
+}
 
 inline void draw_img(image* img){
 	const unsigned int w = img->get_w();
@@ -48,10 +55,17 @@ void exec_func_args(std::string path, std::vector<std::string> args){
 	}
 	::execv(path.c_str(), char_args);
 }
-void exec_func(std::string path){
-	char** args = new char*[1];
-	args[0] = nullptr;
-	::execv(path.c_str(), args);
+void exec_func(const std::string &path){
+	pid_t pid = fork();
+	if(pid == 0){
+		char** args = new char*[1];
+		args[0] = nullptr;
+		::execv(path.c_str(), args);
+	}else if(pid > 0){
+		return;
+	}else{
+		throw_ex("can't fork");
+	}
 }
 
 void launch(std::string path){
@@ -68,7 +82,7 @@ void launch(std::string path){
 		throw std::runtime_error("this user can't launch " + path+
 				"\n"+strerror(errno));
 	}
-	children.emplace_back(new std::thread([=]{ exec_func(path); }));
+	exec_func(path);
 }
 
 class myform:public binform{
@@ -178,7 +192,7 @@ void cb_key_press(const packet p){
 		form->move_cursor_dy(-1);
 	}else if(c == 's'){
 		form->move_cursor_dy(1);
-	}else if(c == '0'){
+	}else if(c == 'q'){
 		form->request_end();
 	}
 }

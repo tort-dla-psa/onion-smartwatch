@@ -1,4 +1,5 @@
 #include <sys/socket.h>
+#include <iostream>
 #include "data_protocol.h"
 #include "API_CALLS.h"
 #include "watchlib.h"
@@ -21,9 +22,14 @@ int main(){
 		std::string data;
 		data_protocol::recv(s_op, cli, data);
 		c = data[0];
-		lib_obj.send("0", API_CALL::UI_key_pressed, { data });
+		std::cout<<data<<" "<<c<<'\n';
+		lib_obj.send(0, API_CALL::UI_key_pressed, { data });
 	}while(c != 'q');
-	s_op.close(cli);
-	s_op.close(sock);
-	s_op.shutdown(sock);
+	try{
+		s_op.close(cli);
+		s_op.close(sock);
+		s_op.shutdown(sock);
+	}catch(const std::runtime_error &e){
+		std::cout<<"error: "<<e.what();
+	}
 }
