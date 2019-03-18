@@ -62,3 +62,17 @@ void packet_sender::disconnect(const std::string &path){
 	print_dbg(std::string("packet_listener at:")+path+" is not connected", 0);
 	throw_ex(std::string("Socket ")+path+(" is not connected"));
 }
+bool packet_sender::is_connected(const sptr<IO::socket> &listener)const{
+	for(const sptr<IO::socket> &sock:listeners){
+		if(sock == listener)
+			return true;
+	}
+	return false;
+}
+bool packet_sender::is_connected(const std::string &path)const{
+	for(const sptr<IO::socket> &sock:listeners){
+		if(sock->get_path() == path)
+			return true;
+	}
+	return false;
+}

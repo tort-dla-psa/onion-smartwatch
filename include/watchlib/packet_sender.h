@@ -29,6 +29,8 @@ public:
 	void connect(const std::string &path);
 	void send(const std::string &path, const packet p);
 	void disconnect(const std::string &path);
+	bool is_connected(const sptr<IO::socket> &listener)const;
+	bool is_connected(const std::string &path)const;
 };
 }
 #endif
