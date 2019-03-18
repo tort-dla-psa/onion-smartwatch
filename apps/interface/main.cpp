@@ -2,15 +2,18 @@
 #include <vector>
 #include <thread>
 #include <mutex>
-#include <chrono>
 #include <sys/socket.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdexcept>
+#include <ctime>
+#include <cmath>
 #include "API_CALLS.h"
 #include "data_protocol.h"
 #include "stat_op.h"
+#include "file_op.h"
+#include "file.h"
 #include "binform.h"
 #include "graphics.h"
 #include "stack.h"
@@ -20,9 +23,10 @@
 #include "watchlib.h"
 
 #define app_w 70
-#define app_h 10
+#define app_h 20
 
 using namespace watches;
+using namespace IO;
 const std::string watches_path("/home/tort/gits/onion-smartwatch/");
 
 std::vector<sptr<std::thread>> children;
@@ -44,20 +48,30 @@ inline void draw_img(image* img){
 	}
 }
 
-void exec_func_args(std::string path, std::vector<std::string> args){
-	char** char_args = new char*[args.size()+1];
-	{
-		int selector = 0;
-		for(const auto &str:args){
-			char_args[selector++] = (char*)(str.c_str());
+void exec_func_args(const std::string &path, const std::vector<std::string> &args){
+	pid_t pid = fork();
+	if(pid == 0){
+		char** char_args = new char*[args.size()+1];
+		{
+			int selector = 0;
+			for(const auto &str:args){
+				char_args[selector++] = (char*)(str.c_str());
+			}
+			char_args = nullptr;
 		}
-		char_args = nullptr;
+		::execv(path.c_str(), char_args);
+	}else if(pid > 0){
+		return;
+	}else{
+		throw_ex("can't fork");
 	}
-	::execv(path.c_str(), char_args);
 }
 void exec_func(const std::string &path){
 	pid_t pid = fork();
 	if(pid == 0){
+		int fd = open("/dev/null", O_WRONLY);
+		dup2(fd, 1);
+		dup2(fd, 2);
 		char** args = new char*[1];
 		args[0] = nullptr;
 		::execv(path.c_str(), args);
@@ -69,7 +83,7 @@ void exec_func(const std::string &path){
 }
 
 void launch(std::string path){
-	IO::stat_op st_op;
+	stat_op st_op;
 	if(!st_op.set_path(path)){
 		throw std::runtime_error("stat error on " + path + 
 				"\n"+strerror(errno));
@@ -85,6 +99,7 @@ void launch(std::string path){
 	exec_func(path);
 }
 
+
 class myform:public binform{
 	std::vector<event> events;
 	struct cursor{
@@ -94,8 +109,8 @@ class myform:public binform{
 		bool changed = true;
 		bit_image img = bit_image(w,h);
 	}c;
+
 	std::vector<sptr<event>> events_vec;
-	sptr<std::thread> loop_thread;
 	std::mutex events_mutex;
 	std::atomic_bool end_requested;
 public:
@@ -107,11 +122,8 @@ public:
 		drawer d;
 		d.draw_line(0,c.h/2,c.w-1,c.h/2,&c.img);
 		d.draw_line(c.h/2,0,c.h/2,c.w-1,&c.img);
-		//loop_thread = std::make_shared<std::thread>(&myform::loop, this);
 	}
 	~myform(){
-		//if(loop_thread->joinable())
-		//	loop_thread->join();
 	}
 	void draw()const{
 		draw_img(this->img.get());
@@ -141,7 +153,7 @@ public:
 					form_el->set_changed(false);
 					continue;
 				}
-				if(c.changed){
+				if(form_el->get_changed() || c.changed){
 					form_el->update();
 					d.draw_image(f_el_x, f_el_y,
 						form_el->get_image(), img);
@@ -197,21 +209,81 @@ void cb_key_press(const packet p){
 	}
 }
 
+class form_clock:public imagebox{
+	struct arrow{
+		int h, w;
+		int x, y;
+		float rad = 0;
+		void update(int cur, int max){
+			const float pi = 3.1415;
+			rad = pi/-2.0 + 2.0*pi / max * cur;
+		}
+		arrow(int x, int y, int w, int h):x(x),y(y),w(w),h(h){}
+		void draw(graphics::drawer &dr, sptr<bit_image> &img){
+			dr.draw_line(x, y, 
+				x + h * std::cos(rad),
+				y + h * std::sin(rad),
+				img);
+		}
+	};
+	arrow *H,*M,*S;
+	sptr<std::thread> update_thr;
+	std::atomic_bool end_requested;
+	std::mutex draw_mt;
+public:
+	form_clock(unsigned int w, unsigned int h):imagebox(w,h){
+		H = new arrow((int)w/2, (int)h/2, 3, 6);
+		M = new arrow((int)w/2, (int)h/2, 2, 7);
+		S = new arrow((int)w/2, (int)h/2, 1, 8);
+		end_requested = false;
+		update_thr = std::make_shared<std::thread>(&form_clock::update_time, this);
+	}
+	~form_clock(){
+		end_requested = true;
+		if(update_thr->joinable())
+			update_thr->join();
+		delete H, M, S;
+	}
+	void update_time(){
+		graphics::drawer dr;
+		sptr<bit_image> temp_img = 
+			std::static_pointer_cast<bit_image>(get_inner_img());
+		while(!end_requested){
+			time_t now = time(0);
+			tm *ltm = localtime(&now);
+			H->update(ltm->tm_hour%12, 12);
+			M->update(ltm->tm_min, 60);
+			S->update(ltm->tm_sec, 60);
+			draw_mt.lock();
+			dr.fill_image(false, temp_img);
+			S->draw(dr, temp_img);
+			M->draw(dr, temp_img);
+			H->draw(dr, temp_img);
+			set_changed(true);
+			draw_mt.unlock();
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+		}
+	}
+	void update(){
+		draw_mt.lock();
+		imagebox::update();
+		draw_mt.unlock();
+	}
+};
+
 int main(){
 	form = sptr<myform>(new myform(app_w, app_h));
 	watchlib lib_obj;
 	lib_obj.init();
 	lib_obj.set_form(form);
 
+	sptr<form_clock> clk(new form_clock(20, 20));
+	form->add_element(clk);
+	clk->move(0, 0);
 	sptr<label> lbl(new label("hi"));
 	form->add_element(lbl);
-	lbl->move(0,0);
+	lbl->move(clk->get_x() + clk->get_w() + 1, 0);
 	lib_obj.add_callback(API_CALL::UI_key_pressed, cb_key_press);
 	launch(watches_path+"bin/companion-server/companion-server");
 	form->loop();
-	for(auto &thr:children){
-		if(thr->joinable()){
-			thr->join();
-		}
-	}
 }
