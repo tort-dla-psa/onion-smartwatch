@@ -4,3 +4,6 @@
 [submodule "submodules/binforms"]
 	path = submodules/binforms
 	url = https://github.com/tort-dla-psa/binforms
+[submodule "submodules/i2c-exp-driver"]
+	path = submodules/i2c-exp-driver
+	url = https://github.com/tort-dla-psa/i2c-exp-driver
