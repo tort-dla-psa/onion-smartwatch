@@ -14,6 +14,8 @@ cxxflags := -ffast-math -std=c++17 $(extra)
 IO:= $(blddir)/IO.flag
 #binforms submodule
 binforms:= $(blddir)/binforms.flag
+#i2c driver
+i2c := $(blddir)/i2c.flag
 
 #logger
 lggr := logger
@@ -44,9 +46,9 @@ app_ui_flags := $(libwatches_trg) ./$(submodsdir)/binforms/lib/*.so -lpthread
 app_ui_s := $(appsdir)/$(app_ui)/*.cpp
 app_ui_h := $(appsdir)/$(app_ui) 
 app_ui_files := $(app_ui_s) #$(appsdir)/$(app_ui)/*.h
-app_ui_inc := -I$(app_ui_h) $(libwatches_inc)
+app_ui_inc := -I$(app_ui_h) $(libwatches_inc) -I$(submodsdir)/i2c-exp-driver/include
 app_ui_trg := $(bindir)/$(app_ui)/$(app_ui)
-app_ui_dep := $(libwatches_trg)
+app_ui_dep := $(libwatches_trg) $(i2c)
 
 #companion-server
 companion_serv := companion-server
@@ -56,7 +58,7 @@ companion_serv_h := $(appsdir)/$(companion_serv)
 companion_serv_files := $(companion_serv_s)
 companion_serv_inc := -I$(companion_serv_h) $(libwatches_inc)
 companion_serv_trg := $(bindir)/$(companion_serv)/$(companion_serv)
-companion_serv_dep := $(IO) $(libwatches_trg)
+companion_serv_dep := $(libwatches_trg)
 
 #client-mock
 cli_mock := interface-client
@@ -93,6 +95,10 @@ $(binforms):
 	$(MAKE) -C $(submodsdir)/binforms/ extra="$(extra)" all
 	touch $(@)
 
+$(i2c):
+	$(MAKE) -C $(submodsdir)/i2c-exp-driver extra="$(extra)" all
+	touch $(@)
+
 $(lggr_trg): $(lggr_files) $(lggr_dep)
 	$(cxx) $(cxxflags) $(lggr_s) $(lggr_inc) $(lggr_flags) -o $@
 
@@ -103,6 +109,8 @@ $(app_ui_trg): $(app_ui_files) $(app_ui_dep)
 	mkdir -p $(bindir)/$(app_ui)
 	$(cxx) $(cxxflags) $(app_ui_s) $(app_ui_inc) \
 		$(submodsdir)/UnixIO-cpp/build/* \
+		$(submodsdir)/i2c-exp-driver/build/*.o \
+		$(submodsdir)/i2c-exp-driver/build/lib/*.o \
 		$(lggr_trg) \
 		$(app_ui_flags) -o $@
 
