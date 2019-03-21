@@ -37,12 +37,12 @@ libwatches_inc := -I$(libwatches_h) \
 		-I$(lggr_h) \
 		-I$(submodsdir)/UnixIO-cpp/include/ \
 		-I$(submodsdir)/binforms/include/
-libwatches_trg := $(libdir)/$(libwatches).so
+libwatches_trg := $(libdir)/libonionwatch.so
 libwatches_dep := $(lggr_trg) $(IO) $(binforms)
 
 #interface
 app_ui := interface
-app_ui_flags := $(libwatches_trg) ./$(submodsdir)/binforms/lib/*.so -lpthread
+app_ui_flags := -Llib -lbinforms -lonionwatch -lpthread
 app_ui_s := $(appsdir)/$(app_ui)/*.cpp
 app_ui_h := $(appsdir)/$(app_ui) 
 app_ui_files := $(app_ui_s) #$(appsdir)/$(app_ui)/*.h
@@ -52,7 +52,7 @@ app_ui_dep := $(libwatches_trg) $(i2c)
 
 #companion-server
 companion_serv := companion-server
-companion_serv_flags := $(libwatches_trg)
+companion_serv_flags := -Llib -lonionwatch 
 companion_serv_s := $(appsdir)/$(companion_serv)/*.cpp
 companion_serv_h := $(appsdir)/$(companion_serv)
 companion_serv_files := $(companion_serv_s)
@@ -93,6 +93,7 @@ $(IO):
 
 $(binforms):
 	$(MAKE) -C $(submodsdir)/binforms/ extra="$(extra)" all
+	mv $(submodsdir)/binforms/lib/* $(libdir)/libbinforms.so
 	touch $(@)
 
 $(i2c):
