@@ -12,8 +12,6 @@
 #include "API_CALLS.h"
 #include "data_protocol.h"
 #include "stat_op.h"
-#include "file_op.h"
-#include "file.h"
 #include "binform.h"
 #include "graphics.h"
 #include "stack.h"
@@ -21,6 +19,8 @@
 #include "event.h"
 #include "imagebox.h"
 #include "watchlib.h"
+#include "oled-exp.h"
+#include "binfont.h"
 
 #define app_w 70
 #define app_h 20
@@ -100,115 +100,6 @@ void launch(std::string path){
 }
 
 
-class myform:public binform{
-	std::vector<event> events;
-	struct cursor{
-		int x=0, y=0;
-		int prev_x=0, prev_y=0;
-		int w=5, h=5;
-		bool changed = true;
-		bit_image img = bit_image(w,h);
-	}c;
-
-	std::vector<sptr<event>> events_vec;
-	std::mutex events_mutex;
-	std::atomic_bool end_requested;
-public:
-	myform(const unsigned int w,
-		const unsigned int h)
-		:binform(w,h)
-	{
-		end_requested = false;
-		drawer d;
-		d.draw_line(0,c.h/2,c.w-1,c.h/2,&c.img);
-		d.draw_line(c.h/2,0,c.h/2,c.w-1,&c.img);
-	}
-	~myform(){
-	}
-	void draw()const{
-		draw_img(this->img.get());
-	}
-	void loop(){
-		drawer d;
-		bit_image clear_cursor_img = bit_image(c.w, c.h);
-		d.fill_image(false, &clear_cursor_img);
-		sptr<bit_image> img = this->img;
-		while(!end_requested){
-			events_mutex.lock();
-			for(const auto &form_el:binform::elements){
-				const int f_el_x = form_el->get_x();
-				const int f_el_y = form_el->get_y();
-				const int f_el_x2 = f_el_x + form_el->get_w();
-				const int f_el_y2 = f_el_y + form_el->get_h();
-				if(f_el_x > c.x + c.w ||
-					f_el_y > c.y + c.h ||
-					f_el_x2 < c.x ||
-					f_el_y2 < c.y)
-				{
-					if(form_el->get_changed()){
-						form_el->update();
-						d.draw_image(f_el_x, f_el_y,
-							form_el->get_image(), img);
-					}
-					form_el->set_changed(false);
-					continue;
-				}
-				if(form_el->get_changed() || c.changed){
-					form_el->update();
-					d.draw_image(f_el_x, f_el_y,
-						form_el->get_image(), img);
-					form_el->set_changed(false);
-				}
-			}
-			if(c.changed){
-				d.draw_image(c.prev_x - c.w/2,
-					c.prev_y - c.h/2,
-					&clear_cursor_img, img.get());
-				d.draw_image(c.x - c.w/2, c.y- c.h/2,
-					&c.img, img.get());
-				c.changed = false;
-			}
-			events_mutex.unlock();
-			draw_img(this->img.get());
-			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-		}
-	}
-	void move_cursor_dx(int dx){
-		events_mutex.lock();
-		c.prev_x = c.x;
-		c.x += dx;
-		c.changed = true;
-		events_mutex.unlock();
-	}
-	void move_cursor_dy(int dy){
-		events_mutex.lock();
-		c.prev_y = c.y;
-		c.y += dy;
-		c.changed = true;
-		events_mutex.unlock();
-	}
-	void request_end(){
-		end_requested = true;
-	}
-};
-
-sptr<myform> form;
-
-void cb_key_press(const packet p){
-	const char c = p.get_args()[0][0];
-	if(c == 'a'){
-		form->move_cursor_dx(-1);
-	}else if(c == 'd'){
-		form->move_cursor_dx(1);
-	}else if(c == 'w'){
-		form->move_cursor_dy(-1);
-	}else if(c == 's'){
-		form->move_cursor_dy(1);
-	}else if(c == 'q'){
-		form->request_end();
-	}
-}
-
 class form_clock:public imagebox{
 	struct arrow{
 		int h, w;
@@ -270,6 +161,171 @@ public:
 		draw_mt.unlock();
 	}
 };
+
+class cursor:public imagebox{
+	int prev_x, prev_y;
+	sptr<bit_image> clear_img;
+public:
+	cursor(int x, int y, unsigned int w, unsigned int h)
+		:imagebox(w, h)
+	{
+		move(x, y);
+		drawer d;
+		sptr<bit_image> temp = std::static_pointer_cast<bit_image>(get_inner_img());
+		d.draw_line(0,h/2,w-1,h/2,temp);
+		d.draw_line(h/2,0,h/2,w-1,temp);
+		clear_img = std::make_shared<bit_image>(w,h);
+	}
+	~cursor(){}
+	void move_dx(int delta){
+		prev_x = x;
+		x += delta;
+		move(x, y);
+		set_changed(true);
+	}
+	void move_dy(int delta){
+		prev_y = y;
+		y += delta;
+		move(x, y);
+		set_changed(true);
+	}
+	int get_prev_x(){
+		return prev_x;
+	}
+	int get_prev_y(){
+		return prev_y;
+	}
+	sptr<bit_image> get_clear_img(){
+		return clear_img;
+	}
+};
+
+class myform:public binform{
+	std::vector<event> events;
+
+	std::vector<sptr<event>> events_vec;
+	std::mutex events_mutex;
+	std::atomic_bool end_requested;
+	fastOledDriver drv;
+	drawer d;
+	sptr<cursor> c;
+	void clear_cursor(){
+		d.draw_image(c->get_prev_x() - c->get_w()/2,
+			c->get_prev_y() - c->get_h()/2,
+			c->get_clear_img(), img);
+	}
+	void draw_cursor(){
+		d.draw_image(c->get_x() - c->get_w()/2,
+			c->get_y() - c->get_h()/2,
+			c->get_image(), img);
+	}
+public:
+	myform(const unsigned int w,
+		const unsigned int h)
+		:binform(w,h)
+	{
+		end_requested = false;
+		drawer d;
+		c = std::make_shared<cursor>(0,0,5,5);
+		drv.init();
+	}
+	~myform(){
+	}
+	void draw(){
+		//TODO: fix this monstrosity
+		draw_img(this->img.get());
+		byte_image* byte_img = binfont::bit_img_to_byte_img(this->img.get());
+		const std::vector<char> bytes = byte_img->get_pixels();
+		char* begin = (char*)&bytes[0];
+		drv.draw((uint8_t*)begin, bytes.size());
+		delete byte_img;
+	}
+	void loop(){
+		sptr<bit_image> img = this->img;
+		while(!end_requested){
+			bool redraw = false;
+			events_mutex.lock();
+			const int c_x = c->get_x(),
+			      c_y = c->get_y(),
+			      c_x2 = c->get_x() + c->get_w(),
+			      c_y2 = c->get_y() + c->get_h();
+			if(c->get_changed()){
+				clear_cursor();
+			}
+			for(const auto &form_el:binform::elements){
+				const int f_el_x = form_el->get_x();
+				const int f_el_y = form_el->get_y();
+				const int f_el_x2 = f_el_x + form_el->get_w();
+				const int f_el_y2 = f_el_y + form_el->get_h();
+				if(f_el_x > c_x2 ||
+					f_el_y > c_y2 ||
+					f_el_x2 < c_x ||
+					f_el_y2 < c_y)
+				{
+					if(form_el->get_changed()){
+						form_el->update();
+						d.draw_image(f_el_x, f_el_y,
+							form_el->get_image(), img);
+						redraw = true;
+					}
+					form_el->set_changed(false);
+					continue;
+				}
+				if(form_el->get_changed() | c->get_changed()){
+					form_el->update();
+					d.draw_image(f_el_x, f_el_y,
+						form_el->get_image(), img);
+					redraw = true;
+					form_el->set_changed(false);
+				}
+			}
+			if(c->get_changed()){
+				draw_cursor();
+				redraw = true;
+				c->set_changed(false);
+			}
+			events_mutex.unlock();
+			if(redraw){
+				draw_img(this->img.get());
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		}
+	}
+	void move_cursor_dx(int dx){
+		events_mutex.lock();
+		clear_cursor();
+		c->move_dx(dx);
+		draw_cursor();
+		events_mutex.unlock();
+	}
+	void move_cursor_dy(int dy){
+		events_mutex.lock();
+		clear_cursor();
+		c->move_dy(dy);
+		draw_cursor();
+		events_mutex.unlock();
+	}
+	void request_end(){
+		end_requested = true;
+	}
+};
+
+sptr<myform> form;
+
+void cb_key_press(const packet p){
+	const char c = p.get_args()[0][0];
+	if(c == 'a'){
+		form->move_cursor_dx(-1);
+	}else if(c == 'd'){
+		form->move_cursor_dx(1);
+	}else if(c == 'w'){
+		form->move_cursor_dy(-1);
+	}else if(c == 's'){
+		form->move_cursor_dy(1);
+	}else if(c == 'q'){
+		form->request_end();
+	}
+}
 
 int main(){
 	form = sptr<myform>(new myform(app_w, app_h));

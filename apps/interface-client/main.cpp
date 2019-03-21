@@ -8,15 +8,18 @@
 using namespace watches;
 using namespace IO;
 
-int main(){
+int main(const int argc, char* argv[]){
 	socket_op s_op;
 	sptr<IO::socket> sock;
 	try{
 		sock = s_op.create(AF_INET, SOCK_STREAM, 0);
-		s_op.connect(sock, "127.0.0.1", 1337);
+		s_op.connect(sock, argv[1], 1337);
 	}catch(const std::runtime_error &e){
 		std::cerr << e.what();
 		return -1;
+	}catch(...){
+		std::cerr << "some error occured\n";
+		return -2;
 	}
 	char c;
 	do{
