@@ -9,7 +9,7 @@ using namespace watches;
 using namespace IO;
 
 int main(){
-	watchlib lib_obj;
+	watchlib lib_obj("companion_server");
 	lib_obj.init();
 
 	socket_op s_op;

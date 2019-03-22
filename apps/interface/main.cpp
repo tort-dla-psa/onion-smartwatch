@@ -308,28 +308,25 @@ public:
 	void request_end(){
 		end_requested = true;
 	}
+	void cb_key_press(const packet &p){
+		const char c = p.get_args()[0][0];
+		if(c == 'a'){
+			move_cursor_dx(-1);
+		}else if(c == 'd'){
+			move_cursor_dx(1);
+		}else if(c == 'w'){
+			move_cursor_dy(-1);
+		}else if(c == 's'){
+			move_cursor_dy(1);
+		}else if(c == 'q'){
+			request_end();
+		}
+	}
 };
 
-sptr<myform> form;
-
-void cb_key_press(const packet p){
-	const char c = p.get_args()[0][0];
-	if(c == 'a'){
-		form->move_cursor_dx(-1);
-	}else if(c == 'd'){
-		form->move_cursor_dx(1);
-	}else if(c == 'w'){
-		form->move_cursor_dy(-1);
-	}else if(c == 's'){
-		form->move_cursor_dy(1);
-	}else if(c == 'q'){
-		form->request_end();
-	}
-}
-
 int main(){
-	form = sptr<myform>(new myform(app_w, app_h));
-	watchlib lib_obj;
+	sptr<myform> form = sptr<myform>(new myform(app_w, app_h));
+	watchlib lib_obj("interface");
 	lib_obj.init();
 	lib_obj.set_form(form);
 
@@ -339,7 +336,7 @@ int main(){
 	sptr<label> lbl(new label("hi"));
 	form->add_element(lbl);
 	lbl->move(clk->get_x() + clk->get_w() + 1, 0);
-	lib_obj.add_callback(API_CALL::UI_key_pressed, cb_key_press);
+	lib_obj.add_callback(API_CALL::UI_key_pressed, &myform::cb_key_press, form);
 	launch(watches_path+"bin/companion-server/companion-server");
 	form->loop();
 }

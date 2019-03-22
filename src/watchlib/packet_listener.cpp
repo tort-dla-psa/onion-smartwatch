@@ -15,46 +15,34 @@ packet_listener_client::packet_listener_client(sptr<IO::socket> sock, int id){
 	connected = true;
 	this->sock = sock;
 	thr = nullptr;
-	dbg = nullptr;
 	this->id = id;
 	this->thr = std::make_shared<std::thread>
 		(&packet_listener_client::process_packets, this);
-#ifdef DEBUG
-	dbg = logger::get_instance();
-#endif
-	print_dbg("created",0);
-}
-void packet_listener_client::print_dbg(const std::string &info, int verb){
-	if(dbg) dbg->output(std::string("packet_listener_client[")+
-			std::to_string(id)+"]", info, verb);
 }
 void packet_listener_client::process_packets(){
 	while(connected){
-		print_dbg("recieving packet",0);
 		std::string data = "";
 		try{
 			data_protocol::recv(s_op, sock, data);
 		}catch(...){
-			print_dbg("can't recieve data on socket",0);
+			//can't recieve packet
 			break;
 		}
-		print_dbg(std::string("got packet:")+data,0);
 		got_packets_flag = true;
 		mt.lock();
 		querry.emplace_back(data);
 		mt.unlock();
 	}
-	print_dbg("exit recieving thread loop",0);
+	//exit recieving thread loop
 }
 packet_listener_client::~packet_listener_client(){
 	disconnect();
 	if(thr->joinable()){
-		print_dbg("joining thread",0);
 		thr->join();
 	}
 }
 void packet_listener_client::throw_ex(const std::string &header){
-	std::string mes = std::string("Packet_listener_client: ")+ header;
+	const auto mes = std::string("packet_listener_client: ")+ header;
 	throw std::runtime_error(mes);
 }
 int packet_listener_client::get_id()const{
@@ -65,7 +53,7 @@ bool packet_listener_client::got_packets(){
 }
 std::vector<packet> packet_listener_client::get_querry(){
 	mt.lock();
-	std::vector<packet> bak = std::move(querry);
+	const auto bak = std::move(querry);
 	got_packets_flag = false;
 	mt.unlock();
 	return bak;
@@ -74,7 +62,6 @@ void packet_listener_client::disconnect(){
 	if(!connected)
 		return;
 	connected = false;
-	print_dbg("disconnecting",0);
 	socket_op s_op;
 	mt.lock();
 	s_op.close(sock);
@@ -92,65 +79,53 @@ packet_listener::packet_listener(const std::string &path, const int max_clients,
 	quit_requested = false;
 	this->proc_sleep = proc_sleep;
 	sock = nullptr;
-	dbg = nullptr;
 	accept_thread = process_thread = nullptr;
-#ifdef DEBUG
-	dbg = logger::get_instance();
-#endif
-	print_dbg(std::string("creating socket at:")+path, 0);
-	sock = s_op.create(path, AF_UNIX, SOCK_STREAM);
-	s_op.bind(sock);
-	s_op.listen(sock, max_clients);
-	print_dbg(std::string("creating socket at:")+path+" done", 0);
+	//creating socket
+	try{
+		sock = s_op.create(path, AF_UNIX, SOCK_STREAM);
+		s_op.bind(sock);
+		s_op.listen(sock, max_clients);
+	}catch(std::runtime_error e){
+		throw_ex("can't establish socket at "+path+": "+e.what());
+	}
 }
 packet_listener::~packet_listener(){
-	print_dbg(std::string("starting destruction:"), 0);
 	if(!quit_requested){
-		print_dbg(std::string("I was not stopper, stopping now"), 0);
+		//I was not stopper, stopping now
 		stop();
 	}
 
-	print_dbg(std::string("removing socket file"), 0);
+	//removing socket file
 	file_op f_op;
 	f_op.remove(sock);
-	//throw_ex(std::string("Can't close socket at ")+sock->get_path());
-	//throw_ex(std::string("Can't unlink socket at ")+sock->get_path());
 	mt.unlock();
-}
-void packet_listener::print_dbg(const std::string &info, int verb){
-	if(dbg) dbg->output("packet_listener", info, verb);
 }
 void packet_listener::throw_ex(const std::string &header){
 	std::string mes = std::string("packet_listener: ")+ header;
 	throw std::runtime_error(mes);
 }
-void packet_listener::add_callback(API_CALL code, func f){
-	mp[code] = f;
-	//TODO: retie if callback allready assigned
-}
 void packet_listener::accept_func(){
-	print_dbg("starting accepting clients", 0);
+	//starting accepting clients
 	int id = -1;
 	while(!quit_requested){
 		sptr<IO::socket> s = nullptr; 
 		try{
 			s = s_op.accept(sock);
 		}catch(const std::runtime_error &e){
-			print_dbg("invalid argument exception on accepting thread, finishing it", 0);
+			//can't accept
 			break;
 		}
 		if(clients.size() >= max_clients){
-			print_dbg("can't accept more clients",0);
-			s_op.close(s);
+			//can't accept more
+			//TODO: send deny to client
+			//s_op.close(s);
 			continue;
 		}
 		id++;
-		print_dbg(std::string("got connection, ID=") + std::to_string(id) ,0);
 		mt.lock();
 		clients.emplace_back(new packet_listener_client(s, id));
 		mt.unlock();
 	}
-	print_dbg("finishing accepting clients", 0);
 }
 void packet_listener::process_func(){
 	while(!quit_requested){
@@ -158,6 +133,7 @@ void packet_listener::process_func(){
 		std::this_thread::sleep_for(std::chrono::milliseconds(proc_sleep));
 		std::vector<packet> querry;
 		mt.lock();
+		//get all packets
 		auto it = clients.begin();
 		while(it != clients.end()){
 			sptr<packet_listener_client> cli = (*it);
@@ -166,15 +142,14 @@ void packet_listener::process_func(){
 				querry.insert(querry.end(), packets.begin(), packets.end());
 			}
 			if(!cli->get_connected()){
-				print_dbg(std::string("destroing client")+
-					std::to_string((*it)->get_id()),0);
+				//destroing client
 				it = clients.erase(it);
+				continue;
 			}
 			it++;
 		}
-		for(const packet &p:querry){
-			std::map<API_CALL, func>::iterator it = 
-				mp.find(p.get_val());
+		for(const auto &p:querry){
+			std::map<API_CALL, cb>::iterator it = mp.find(p.get_val());
 			if(it != mp.end()){
 				(it->second)(p);
 			}
@@ -183,7 +158,6 @@ void packet_listener::process_func(){
 	}
 }
 void packet_listener::start(){
-	print_dbg(std::string("starting"), 0);
 	accept_thread = std::make_shared<std::thread>
 		(&packet_listener::accept_func, this);
 	process_thread = std::make_shared<std::thread>
@@ -191,11 +165,12 @@ void packet_listener::start(){
 }
 void packet_listener::stop(){
 	quit_requested = true;
-	print_dbg(std::string("stopping"), 0);
 
 	mt.lock();
-	print_dbg(std::string("shutting socket down"), 0);
-	s_op.shutdown(sock);
+	try{
+		s_op.shutdown(sock);
+	}catch(...){
+	}
 	mt.unlock();
 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
@@ -206,18 +181,19 @@ void packet_listener::stop(){
 		process_thread->join();
 	}
 
-	print_dbg(std::string("disconnecting clients"), 0);
+	//disconnecting clients
 	mt.lock();
 	for(sptr<packet_listener_client> &cl:clients){
-		print_dbg(std::string("forcing disconnection of client:") +
-			std::to_string(cl->get_id()), 0);
-		cl->disconnect();
+		//forcing disconnection of client
+		try{
+			cl->disconnect();
+		}catch(...){
+			continue;
+		}
 	}
 	clients.clear();
-	print_dbg(std::string("closing socket"), 0);
 	s_op.close(sock);
 	mt.unlock();
-	print_dbg("stopped", 0);
 }
 int packet_listener::get_processing_sleep()const{
 	return proc_sleep;

@@ -1,78 +1,98 @@
 #include <stdexcept>
+#include <algorithm>
 #include <sys/socket.h>
 #include "packet_sender.h"
 #include "data_protocol.h"
 
 using namespace watches;
 
-packet_sender::packet_sender(){
-	dbg = nullptr;
-#ifdef DEBUG
-	dbg = logger::get_instance();
-#endif
-	print_dbg("created", 0);
-}
+packet_sender::packet_sender(){ }
 packet_sender::~packet_sender(){
-	print_dbg("disconnecting and destructing", 0);
 	for(sptr<IO::socket> &sock:listeners){
-		print_dbg(std::string("disconnecting from ")+sock->get_path(), 0);
-		s_op.close(sock);
+		try{
+			s_op.close(sock);
+		}catch(std::runtime_error e){
+			throw_ex(e.what());
+		}
 	}
 	listeners.clear();
-}
-void packet_sender::print_dbg(const std::string &info, int verb){
-	if(dbg) dbg->output("packet_sender", info, verb);
 }
 void packet_sender::throw_ex(const std::string &header){
 	std::string mes = std::string("packet_sender: ")+ header;
 	throw std::runtime_error(mes);
 }
 void packet_sender::connect(const std::string &path){
-	print_dbg(std::string("connecting to:")+path, 0);
-	for(const sptr<IO::socket> &sock:listeners){
-		if(sock->get_path() == path)
-			throw_ex(std::string("socket at:")+path+(" allready connected"));
+	const auto it = std::find_if(listeners.begin(), listeners.end(), 
+		[&](const auto &sock){ return sock->get_path() == path; });
+	if(it != listeners.end()){ //socket is connected
+		return;
 	}
-	sptr<IO::socket> sock = s_op.create(path, AF_UNIX, SOCK_STREAM);
-	s_op.connect(sock);
-	listeners.emplace_back(sock);
+	try{
+		connect(path);
+		sptr<IO::socket> sock = s_op.create(path, AF_UNIX, SOCK_STREAM);
+		s_op.connect(sock);
+		listeners.emplace_back(sock);
+	}catch(std::runtime_error e){
+		throw_ex(std::string("can't connect to ")+path+" "+e.what());
+	}
 }
-void packet_sender::send(const std::string &path, const packet p){
-	const std::string data = p.serialize();
-	print_dbg(std::string("sending packet:")+data+" to:"+path, 0);
-	for(const sptr<IO::socket> &sock:listeners){
-		if(sock->get_path() == path){
+void packet_sender::send_by_path(const std::string &path, const packet &p){
+	const auto it = std::find_if(listeners.begin(), listeners.end(), 
+		[&](const auto &sock){ return sock->get_path() == path; });
+	if(it == listeners.end()){ //socket is not connected
+		throw_ex("isn't connected to: "+path);
+	}else{
+		const sptr<IO::socket> sock = *it;
+		try{
+			const std::string data = p.serialize();
 			data_protocol::send(s_op, sock, data);
-			return;
+		}catch(std::runtime_error e){
+			throw_ex(std::string("can't send to ")+path+" "+e.what());
 		}
 	}
-	print_dbg(std::string("packet_listener at:")+path+" is not connected", 0);
-	throw_ex(std::string("Socket ")+path+(" is not connected"));
 }
-void packet_sender::disconnect(const std::string &path){
+void packet_sender::send_by_name(const std::string &name, const packet &p){
+	const auto it = name_path_pair.find(name);
+	if(it == name_path_pair.end()){ //socket is not connected
+		throw_ex("no path is associated with:"+name);
+	}else{
+		send_by_path(it->second, p);
+	}
+}
+void packet_sender::disconn_by_path(const std::string &path){
 	auto it = listeners.begin();
 	while(it != listeners.end()){
 		if((*it)->get_path() == path){
-			s_op.close(*it);
+			try{
+				s_op.close(*it);
+			}catch(std::runtime_error e){
+				//can't close socket
+			}
 			it = listeners.erase(it);
 			return;
 		}
 		it++;
 	}
-	print_dbg(std::string("packet_listener at:")+path+" is not connected", 0);
-	throw_ex(std::string("Socket ")+path+(" is not connected"));
+	throw_ex(std::string("socket ")+path+(" is not connected"));
 }
-bool packet_sender::is_connected(const sptr<IO::socket> &listener)const{
-	for(const sptr<IO::socket> &sock:listeners){
+bool packet_sender::is_conn(const sptr<IO::socket> &listener)const{
+	for(const auto &sock : listeners){
 		if(sock == listener)
 			return true;
 	}
 	return false;
 }
-bool packet_sender::is_connected(const std::string &path)const{
-	for(const sptr<IO::socket> &sock:listeners){
-		if(sock->get_path() == path)
-			return true;
-	}
-	return false;
+bool packet_sender::is_conn_by_path(const std::string &path)const{
+	const auto it = std::find_if(listeners.begin(), listeners.end(),
+		[&](const auto &sock){ return (sock->get_path() == path); });
+	return (it != listeners.end());
 }
+bool packet_sender::is_conn_by_name(const std::string &name)const{
+	const auto it = std::find_if(name_path_pair.begin(), name_path_pair.end(),
+		[&](const auto &el){ return el.first == name; });
+	return (it != name_path_pair.end());
+}
+void packet_sender::associate(const std::string &path, const std::string &name){
+	name_path_pair[name] = path;
+}
+

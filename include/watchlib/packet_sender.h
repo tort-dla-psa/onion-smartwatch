@@ -2,6 +2,7 @@
 #define packet_sender_h
 
 #include <vector>
+#include <map>
 #include <memory>
 #include <thread>
 #include <mutex>
@@ -9,7 +10,6 @@
 #include "packet.h"
 #include "file.h"
 #include "socket_op.h"
-#include "logger.h"
 
 template<typename T>
 using sptr = std::shared_ptr<T>;
@@ -21,16 +21,19 @@ class packet_sender{
 	socket_op s_op;
 	std::vector<sptr<IO::socket>> listeners;
 	void throw_ex(const std::string &header);
-	sptr<logger> dbg;
-	void print_dbg(const std::string &info, int verb);
+	std::map<std::string, std::string> name_path_pair;
 public:
 	packet_sender();
 	~packet_sender();
 	void connect(const std::string &path);
-	void send(const std::string &path, const packet p);
-	void disconnect(const std::string &path);
-	bool is_connected(const sptr<IO::socket> &listener)const;
-	bool is_connected(const std::string &path)const;
+	void send_by_path(const std::string &path, const packet &p);
+	void send_by_name(const std::string &name, const packet &p);
+	void disconn_by_path(const std::string &path);
+	void disconn_by_name(const std::string &name);
+	bool is_conn(const sptr<IO::socket> &listener)const;
+	bool is_conn_by_path(const std::string &path)const;
+	bool is_conn_by_name(const std::string &name)const;
+	void associate(const std::string &path, const std::string &name);
 };
 }
 #endif
