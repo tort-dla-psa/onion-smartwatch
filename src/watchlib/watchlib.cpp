@@ -71,12 +71,9 @@ void watchlib::init_dir(){
 
 	//check and create watches dir
 	if(!d_op.check(watches_path)){
-		send_log(std::string("creating watches dir: ")+watches_path,
-			API_CALL::LOG_send_info);
 		try{
 			d_op.create(watches_path);
 		}catch(const std::runtime_error &e){
-			send_log(e.what(), API_CALL::LOG_send_error);
 			throw_ex(e.what());
 		}
 	}
@@ -84,13 +81,10 @@ void watchlib::init_dir(){
 	//TODO:change to subscription
 	try{
 		if(f_op.check(lock_path)){
-			send_log(std::string("lock file exists at: ")+lock_path+", waiting",
-				API_CALL::LOG_send_info);
 			while(f_op.check(lock_path)) //check lock
 				usleep(100000);
 		}
 	}catch(const std::runtime_error &e){
-		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
 
@@ -99,7 +93,6 @@ void watchlib::init_dir(){
 		lock_f = f_op.create(lock_path, O_RDONLY, 0644);
 		f_op.close(lock_f);
 	}catch(const std::runtime_error &e){
-		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
 
@@ -110,7 +103,6 @@ void watchlib::init_dir(){
 			lastpid_f = f_op.create(lastpid_path, O_RDWR, 0644);
 		}
 	}catch(const std::runtime_error &e){
-		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
 
@@ -123,7 +115,6 @@ void watchlib::init_dir(){
 		this->app_pid = last+1;
 		dirname = std::to_string(app_pid);
 	}catch(const std::runtime_error &e){
-		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
 
@@ -137,7 +128,6 @@ void watchlib::init_dir(){
 		
 		f_op.remove(lock_f);
 	}catch(const std::runtime_error &e){
-		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
 }

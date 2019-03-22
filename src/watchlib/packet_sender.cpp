@@ -1,3 +1,4 @@
+#include <iostream>
 #include <stdexcept>
 #include <algorithm>
 #include <sys/socket.h>
@@ -52,7 +53,7 @@ void packet_sender::send_by_path(const std::string &path, const packet &p){
 	}
 }
 void packet_sender::send_by_name(const std::string &name, const packet &p){
-	const auto it = name_path_pair.find(name);
+	auto it = name_path_pair.find(name);
 	if(it == name_path_pair.end()){ //socket is not connected
 		throw_ex("no path is associated with:"+name);
 	}else{
@@ -88,8 +89,7 @@ bool packet_sender::is_conn_by_path(const std::string &path)const{
 	return (it != listeners.end());
 }
 bool packet_sender::is_conn_by_name(const std::string &name)const{
-	const auto it = std::find_if(name_path_pair.begin(), name_path_pair.end(),
-		[&](const auto &el){ return el.first == name; });
+	const auto it = name_path_pair.find(name);
 	return (it != name_path_pair.end());
 }
 void packet_sender::associate(const std::string &path, const std::string &name){
