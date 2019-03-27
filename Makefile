@@ -81,63 +81,69 @@ app_hello_dep := $(libwatches_trg)
 .DEFAULT_GOAL = all
 
 prepare:
-	mkdir -p $(blddir) $(libdir) $(bindir)
+	@mkdir -p $(blddir) $(libdir) $(bindir)
 
 $(IO):
-	$(MAKE) -C $(submodsdir)/UnixIO-cpp/ extra="$(extra)" all
-	cp $(submodsdir)/UnixIO-cpp/lib/* $(libdir)/libunixiocpp.so
-	touch $(@)
+	@$(MAKE) -C $(submodsdir)/UnixIO-cpp/ extra="$(extra)" all
+	@cp $(submodsdir)/UnixIO-cpp/lib/* $(libdir)/libunixiocpp.so
+	@touch $(@)
 
 $(binforms):
-	$(MAKE) -C $(submodsdir)/binforms/ extra="$(extra)" all
-	cp $(submodsdir)/binforms/lib/* $(libdir)/libbinforms.so
-	touch $(@)
+	@$(MAKE) -C $(submodsdir)/binforms/ extra="$(extra)" all
+	@cp $(submodsdir)/binforms/lib/* $(libdir)/libbinforms.so
+	@touch $(@)
 
 $(i2c):
-	$(MAKE) -C $(submodsdir)/i2c-exp-driver extra="$(extra)" all
-	touch $(@)
+	@$(MAKE) -C $(submodsdir)/i2c-exp-driver extra="$(extra)" all
+	@touch $(@)
 
 $(libwatches_trg): $(libwatches_files) $(libwatches_dep)
-	$(cxx) $(cxxflags) $(libwatches_s) $(libwatches_inc) $(libwatches_flags) -o $@
+	@echo "compile $< $@"
+	@$(cxx) $(cxxflags) $(libwatches_s) $(libwatches_inc) $(libwatches_flags) -o $@
 
 $(app_ui_trg): $(app_ui_files) $(app_ui_dep)
-	mkdir -p $(bindir)/$(app_ui)
-	$(cxx) $(cxxflags) $(app_ui_s) $(app_ui_inc) \
+	@echo "compile $< $@"
+	@mkdir -p $(bindir)/$(app_ui)
+	@$(cxx) $(cxxflags) $(app_ui_s) $(app_ui_inc) \
 		$(submodsdir)/i2c-exp-driver/build/*.o \
 		$(submodsdir)/i2c-exp-driver/build/lib/*.o \
 		$(app_ui_flags) -o $@
 
 $(companion_serv_trg): $(companion_serv_files) $(companion_serv_dep)
-	mkdir -p $(bindir)/$(companion_serv)
-	$(cxx) $(cxxflags) $(companion_serv_s) $(companion_serv_inc) \
+	@echo "compile $< $@"
+	@mkdir -p $(bindir)/$(companion_serv)
+	@$(cxx) $(cxxflags) $(companion_serv_s) $(companion_serv_inc) \
 		$(companion_serv_flags) -o $@
 
 $(app_hello_trg): $(app_hello_files) $(app_hello_dep)
-	mkdir -p $(bindir)/$(app_hello)
-	$(cxx) $(cxxflags) $(app_hello_s) $(app_hello_inc) \
+	@echo "compile $< $@"
+	@mkdir -p $(bindir)/$(app_hello)
+	@$(cxx) $(cxxflags) $(app_hello_s) $(app_hello_inc) \
 		$(app_hello_flags) -o $(app_hello_trg)
 
 $(cli_mock_trg): $(cli_mock_files) $(cli_mock_dep)
-	mkdir -p $(bindir)/$(cli_mock)
-	$(cxx) $(cxxflags) $(cli_mock_s) $(cli_mock_inc) \
+	@echo "compile $< $@"
+	@mkdir -p $(bindir)/$(cli_mock)
+	@$(cxx) $(cxxflags) $(cli_mock_s) $(cli_mock_inc) \
 		$(srcdir)/$(libwatches)/packet.cpp \
 	       	$(cli_mock_flags) -o $(cli_mock_trg)
 
 $(lggr_trg): $(lggr_files) $(lggr_dep)
-	mkdir -p $(bindir)/$(lggr)
-	$(cxx) $(cxxflags) $(lggr_s) $(lggr_inc) $(lggr_flags) -o $@
+	@echo "compile $< $@"
+	@mkdir -p $(bindir)/$(lggr)
+	@$(cxx) $(cxxflags) $(lggr_s) $(lggr_inc) $(lggr_flags) -o $@
 
 $(libwatches): $(libwatches_trg)
 $(app_ui): $(app_ui_trg)
 # $(app_hello): $(app_hello_trg)
 $(cli_mock): $(cli_mock_trg)
 $(companion_serv): $(companion_serv_trg)
-$(logger): $(lggr_trg)
+$(lggr): $(lggr_trg)
 
-all: prepare $(app_ui) $(cli_mock) $(companion_serv) $(logger) #$(app_hello) 
+all: prepare $(app_ui) $(cli_mock) $(companion_serv) $(lggr) #$(app_hello) 
 
 clean:
-	rm -rf $(blddir) $(libdir) $(bindir)
-	$(MAKE) -C $(submodsdir)/UnixIO-cpp/ clean
-	$(MAKE) -C $(submodsdir)/binforms/ clean
-	$(MAKE) -C $(submodsdir)/i2c-exp-driver/ clean
+	@rm -rf $(blddir) $(libdir) $(bindir)
+	@$(MAKE) -C $(submodsdir)/UnixIO-cpp/ clean
+	@$(MAKE) -C $(submodsdir)/binforms/ clean
+	@$(MAKE) -C $(submodsdir)/i2c-exp-driver/ clean
