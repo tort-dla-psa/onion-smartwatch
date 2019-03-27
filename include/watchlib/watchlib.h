@@ -25,7 +25,6 @@ protected:
 	void init_dir();
 	void init_ipc();
 	void throw_ex(const std::string &mes);
-	void send_log(const std::string &mes, API_CALL LOG_api_call);
 	packet construct_packet(API_CALL code, const std::vector<std::string> &args);
 	void cb_ask_info(const packet &p);
 	void cb_tell_info(const packet &p);
@@ -59,6 +58,7 @@ public:
 	void send(const int pid, API_CALL code, const std::vector<std::string> &args);
 	void send(const std::string &name, API_CALL code,
 			const std::vector<std::string> &args);
+	void send_log(const std::string &mes, API_CALL LOG_api_call);
 	void broadcast(API_CALL code, const std::vector<std::string> &args);
 };
 

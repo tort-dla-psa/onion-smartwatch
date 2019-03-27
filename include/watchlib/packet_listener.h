@@ -49,8 +49,8 @@ class packet_listener{
 	std::atomic<int> proc_sleep;
 	socket_op s_op;
 	sptr<IO::socket> sock;
-	typedef std::function<void(const packet&)>cb;
-	std::map<API_CALL, cb> mp;
+	typedef std::function<void(const packet&)> cb; //callback allias
+	std::map<API_CALL, cb> mp; 	//<==== callbacks
 	std::vector<sptr<packet_listener_client>> clients;
 	sptr<std::thread> accept_thread, process_thread;
 	void print_err(const std::string &info);

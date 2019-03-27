@@ -6,6 +6,7 @@ namespace watches{
 enum class API_CALL{
 	ask_info = 0,
 	tell_info,
+	request_end,
 	UI_key_pressed,
 	UI_key_released,
 	UI_cursor_moved,

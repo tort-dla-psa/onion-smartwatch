@@ -329,6 +329,7 @@ int main(){
 	watchlib lib_obj("interface");
 	lib_obj.init();
 	lib_obj.set_form(form);
+	lib_obj.send_log("init succseed", API_CALL::LOG_send_info);
 
 	sptr<form_clock> clk(new form_clock(20, 20));
 	form->add_element(clk);

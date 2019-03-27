@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread>
 #include "file.h"
 #include "file_op.h"
 #include "watchlib.h"
@@ -6,19 +7,30 @@
 using namespace watches;
 using namespace IO;
 
-void cb_info(packet p){
+bool end_requested = false;
 
+void cb_info(const packet &p){
+	std::cout<<"[info]:"<<p.get_name()<<":"<<p.get_args()[0]<<"\n";
 }
-void cb_debug(packet p){
-
+void cb_debug(const packet &p){
+	std::cout<<"[debug]:"<<p.get_name()<<":"<<p.get_args()[0]<<"\n";
 }
-void cb_error(packet p){
-
+void cb_error(const packet &p){
+	std::cout<<"[error]:"<<p.get_name()<<":"<<p.get_args()[0]<<"\n";
+}
+void cb_end(const packet &p){
+	std::cout<<"end requested, ending\n";
+	end_requested = true;
 }
 
 int main(const int argc, char* argv[]){
-	watchlib lib_obj;
+	watchlib lib_obj("logger");
+	lib_obj.init();
 	lib_obj.add_callback(API_CALL::LOG_send_info, cb_info);
 	lib_obj.add_callback(API_CALL::LOG_send_debug, cb_debug);
 	lib_obj.add_callback(API_CALL::LOG_send_error, cb_error);
+	lib_obj.add_callback(API_CALL::request_end, cb_end);
+	while(!end_requested){
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
 }
