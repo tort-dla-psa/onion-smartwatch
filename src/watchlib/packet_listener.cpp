@@ -74,10 +74,12 @@ bool packet_listener_client::get_connected(){
 
 //============packet_listener==============//
 packet_listener::packet_listener(const std::string &path, const int max_clients,
-		const int proc_sleep)
+		const int proc_sleep,
+		const std::shared_ptr<types::concurrent_queue<packet>> calls_queue)
 {
 	quit_requested = false;
 	this->proc_sleep = proc_sleep;
+	this->calls_queue = calls_queue;
 	sock = nullptr;
 	accept_thread = process_thread = nullptr;
 	//creating socket
@@ -149,10 +151,7 @@ void packet_listener::process_func(){
 			it++;
 		}
 		for(const auto &p:querry){
-			std::map<API_CALL, cb>::iterator it = mp.find(p.get_val());
-			if(it != mp.end()){
-				(it->second)(p);
-			}
+			calls_queue->push(p);
 		}
 		mt.unlock();
 	}

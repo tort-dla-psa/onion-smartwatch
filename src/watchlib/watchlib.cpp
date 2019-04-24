@@ -24,6 +24,7 @@ watchlib::watchlib(const std::string &name)
 	init_status = false;
 	app_pid = -1;
 	appform = nullptr;
+	this_ptr = sptr<watchlib>(this);
 }
 
 watchlib::~watchlib(){
@@ -144,9 +145,13 @@ void watchlib::init_ipc(){
 	const std::string p_lis_path = std::string(watches_path) + 
 		std::to_string(app_pid) + "/" + p_lis_name;
 	try{
-		p_lis = std::make_unique<packet_listener>(p_lis_path, max_cli, proc_sleep);
+		const sptr<types::concurrent_queue<packet>> packets_queue;
+		p_lis = std::make_unique<packet_listener>(p_lis_path, max_cli, proc_sleep,
+				packets_queue);
 		p_lis->start();
 		p_send = std::make_unique<packet_sender>();
+		invkr = std::make_unique<callback_invoker>(packets_queue,
+				std::chrono::milliseconds(100));
 	}catch(const std::runtime_error &e){
 		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
@@ -157,7 +162,8 @@ void watchlib::init(){
 	try{
 		init_dir();
 		init_ipc();
-		p_lis->add_callback(API_CALL::tell_info, &watchlib::cb_ask_info, this);
+		auto self_ptr = shared_from_this();
+		invkr->add_callback(API_CALL::tell_info, &watchlib::cb_ask_info, self_ptr);
 	}catch(const std::runtime_error &e){
 		//send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
@@ -265,6 +271,9 @@ void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
 			}
 		}
 		const auto subdir = d_op.open(cast->get_path());
+		if(subdir->get_name() == std::to_string(this->app_pid)){
+			continue; // avoid connecting to self
+		}
 		const auto subdir_files = d_op.list(subdir);
 		for(const auto &subdir_file : subdir_files){//get listener socket
 			auto cast = std::dynamic_pointer_cast<IO::socket>(subdir_file);
