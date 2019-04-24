@@ -8,12 +8,12 @@
 #include "file_op.h"
 #include "dir_op.h"
 
-const std::string watches_path = "/tmp/watches/";
-const std::string lock_name = "update_lock";
-const std::string lock_path = watches_path+lock_name;
-const std::string lastpid_name = "lastpid";
-const std::string lastpid_path = watches_path + lastpid_name;
-const std::string p_lis_name = "p_lis";
+const std::string watches_path = "/tmp/watches/",
+	lock_name = "update_lock",
+	lock_path = watches_path + lock_name,
+	lastpid_name = "lastpid",
+	lastpid_path = watches_path + lastpid_name,
+	p_lis_name = "p_lis";
 
 using namespace watches;
 using namespace IO;
@@ -31,10 +31,12 @@ watchlib::~watchlib(){
 		end();
 	}
 }
+
 void watchlib::throw_ex(const std::string &mes){
 	const std::string out_mes = std::string("watchlib: ")+mes+"\n";
 	throw std::runtime_error(out_mes);
 }
+
 void watchlib::send_log(const std::string &mes, API_CALL LOG_api_call){
 	if(LOG_api_call < API_CALL::LOG_send_info ||
 		LOG_api_call > API_CALL::LOG_send_error)
@@ -43,14 +45,17 @@ void watchlib::send_log(const std::string &mes, API_CALL LOG_api_call){
 	}
 	send("logger", LOG_api_call, { "watchlib", mes });
 }
+
 packet watchlib::construct_packet(API_CALL code, const std::vector<std::string> &args){
 	return packet(code, app_pid, unix_pid, name, args);
 }
+
 void watchlib::cb_ask_info(const packet &p){
 	const std::string path = watches_path + std::to_string(p.get_pid()) +
 		"/" + p_lis_name;
 	p_send->send_by_path(path, construct_packet(API_CALL::tell_info, {}));
 }
+
 void watchlib::cb_tell_info(const packet &p){
 	const auto name = p.get_name();
 	const std::string path = watches_path + std::to_string(p.get_pid()) +
@@ -61,6 +66,7 @@ void watchlib::cb_tell_info(const packet &p){
 		apps_info.emplace_back(path, name);
 	}
 }
+
 void watchlib::init_dir(){
 	file_op f_op;
 	dir_op d_op;
@@ -153,7 +159,7 @@ void watchlib::init(){
 		init_ipc();
 		p_lis->add_callback(API_CALL::tell_info, &watchlib::cb_ask_info, this);
 	}catch(const std::runtime_error &e){
-		send_log(e.what(), API_CALL::LOG_send_error);
+		//send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
 	init_status = true;
@@ -197,12 +203,14 @@ void watchlib::set_form(sptr<binform> appform){
 sptr<binform> watchlib::get_form()const{
 	return appform;
 }
+
 void watchlib::send(const int pid, API_CALL code, const std::vector<std::string> &args){
 	const std::string path = watches_path + std::to_string(pid) + "/" + p_lis_name;
 	if(!p_send->is_conn_by_path(path))
 		p_send->connect(path);
 	p_send->send_by_path(path, {code, app_pid, unix_pid, name, std::move(args)});
 }
+
 void watchlib::send(const std::string &name, API_CALL code,
 	const std::vector<std::string> &args)
 {
@@ -241,6 +249,7 @@ void watchlib::send(const std::string &name, API_CALL code,
 		p_send->send_by_name(name, construct_packet(code,std::move(args)));
 	}
 }
+
 void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
 	dir_op d_op;
 	const auto dir = d_op.open(watches_path);
@@ -249,18 +258,22 @@ void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
 		auto cast = std::dynamic_pointer_cast<IO::dir>(file);
 		if(!cast) //file is not dir
 			continue;
-		const auto pid_dir = d_op.open(cast->get_path());
-		const auto pid_dir_files = d_op.list(pid_dir);
-		for(const auto &pid_dir_file : pid_dir_files){//get listener socket
-			std::string name;
-			{//get name from path
-				name = pid_dir_file->get_path();
-				int pos = name.find_last_of('/');
-				name = name.substr(pos);
+		{
+			const auto name = cast->get_name();
+			if(name == "." || name == ".."){
+				continue;
 			}
+		}
+		const auto subdir = d_op.open(cast->get_path());
+		const auto subdir_files = d_op.list(subdir);
+		for(const auto &subdir_file : subdir_files){//get listener socket
+			auto cast = std::dynamic_pointer_cast<IO::socket>(subdir_file);
+			if(!cast)
+				continue;
+			const auto path = subdir_file->get_path();
+			const auto name = subdir_file->get_name();
 			if(name != p_lis_name)//it's not p_lis socket
 				continue;
-			const std::string path = pid_dir_file->get_path();
 			if(!p_send->is_conn_by_path(path))
 				p_send->connect(path);
 			const packet p = construct_packet(code, args);
