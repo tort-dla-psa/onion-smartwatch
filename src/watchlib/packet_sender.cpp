@@ -29,7 +29,6 @@ void packet_sender::connect(const std::string &path){
 		return;
 	}
 	try{
-		connect(path);
 		sptr<IO::socket> sock = s_op.create(path, AF_UNIX, SOCK_STREAM);
 		s_op.connect(sock);
 		listeners.emplace_back(sock);
