@@ -145,7 +145,7 @@ void watchlib::init_ipc(){
 	const std::string p_lis_path = std::string(watches_path) + 
 		std::to_string(app_pid) + "/" + p_lis_name;
 	try{
-		const sptr<types::concurrent_queue<packet>> packets_queue;
+		auto packets_queue = std::make_shared<types::concurrent_queue<packet>>();
 		p_lis = std::make_unique<packet_listener>(p_lis_path, max_cli, proc_sleep,
 				packets_queue);
 		p_lis->start();
@@ -290,4 +290,8 @@ void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
 			p_send->disconn_by_path(path);
 		}
 	}
+}
+
+void watchlib::start(){
+	invkr->start_processing();
 }

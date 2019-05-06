@@ -59,6 +59,7 @@ public:
 			const std::vector<std::string> &args);
 	void send_log(const std::string &mes, API_CALL LOG_api_call);
 	void broadcast(API_CALL code, const std::vector<std::string> &args);
+	void start();
 };
 
 };

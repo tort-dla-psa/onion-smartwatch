@@ -30,13 +30,13 @@ class packet_listener_client{
 	socket_op s_op;
 	int id;
 	void throw_ex(const std::string &header);
-	std::vector<packet> querry;
+	std::vector<packet> queue;
 	std::atomic<bool> connected, got_packets_flag;
 	void process_packets();
 public:
 	packet_listener_client(sptr<IO::socket> sock, int id);
 	~packet_listener_client();
-	std::vector<packet> get_querry();
+	std::vector<packet> get_queue();
 	bool got_packets();
 	int get_id()const;
 	void disconnect();
@@ -53,14 +53,14 @@ class packet_listener{
 	std::vector<sptr<packet_listener_client>> clients;
 	sptr<std::thread> accept_thread, process_thread;
 	void print_err(const std::string &info);
-	std::shared_ptr<types::concurrent_queue<packet>> calls_queue;
+	std::shared_ptr<types::concurrent_queue<packet>> packets_queue;
 protected:
 	void throw_ex(const std::string &header);
 	void accept_func();
 	void process_func();
 public:
 	packet_listener(const std::string &path, const int max_clients, const int proc_sleep,
-			const std::shared_ptr<types::concurrent_queue<packet>> calls_queue);
+			const std::shared_ptr<types::concurrent_queue<packet>> packets_queue);
 	~packet_listener();
 	void start();
 	void stop();

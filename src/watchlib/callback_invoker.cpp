@@ -10,7 +10,7 @@ callback_invoker::callback_invoker(const sptr<types::concurrent_queue<packet>> &
 
 void callback_invoker::start_processing(){
 	while(true){
-		packet p = packet(0);
+		packet p(API_CALL::ask_info,0,0,"null",{}); // temp packet
 		if(!packets_queue->wait_pop(p)){
 			std::this_thread::sleep_for(process_sleep);
 			continue;
