@@ -52,20 +52,22 @@ packet watchlib::construct_packet(API_CALL code, const std::vector<std::string> 
 }
 
 void watchlib::cb_ask_info(const packet &p){
+	//tell this app's info to other app
 	const std::string path = watches_path + std::to_string(p.get_pid()) +
 		"/" + p_lis_name;
 	p_send->send_by_path(path, construct_packet(API_CALL::tell_info, {}));
 }
 
 void watchlib::cb_tell_info(const packet &p){
+	//save other app name and tie it with it's path
 	const auto name = p.get_name();
 	const std::string path = watches_path + std::to_string(p.get_pid()) +
 		"/" + p_lis_name;
-	const auto it = std::find_if(apps_info.begin(), apps_info.end(),
+	/*const auto it = std::find_if(apps_info.begin(), apps_info.end(),
 		[&](const auto &pair){ return (pair.first == path); });
-	if(it == apps_info.end()){
-		apps_info.emplace_back(path, name);
-	}
+	if(it == apps_info.end()){*/
+		apps_info[name] = path;
+//	}
 }
 
 void watchlib::init_dir(){
@@ -221,39 +223,29 @@ void watchlib::send(const std::string &name, API_CALL code,
 	const std::vector<std::string> &args)
 {
 	//1.ask every app for info;
-	//2.packet_listener will get answer and call cb_tell_info in other thread;
-	//3.cb_tell_info will add path and name to "found_names" vector;
-	//4.this metod will iterate through "found_names" vector and connect
+	//2.packet_listener will get answer and call cb_tell_info
+	//3.cb_tell_info will add path and name to "apps_info" vector;
+	//4.this metod will iterate through "apps_info" vector and connect
 	//	to each path with desired name;
 	//5.add path-name association to p_send;
 	if(!p_send->is_conn_by_name(name)){
 		broadcast(API_CALL::ask_info, {});
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));//wait for apps
-		auto it = apps_info.begin();
-		while(it != apps_info.end()){
-			if(it->second == name){
-				if(p_send->is_conn_by_path(it->first)){
-					//delete if p_send allready connected to this path
-					it = apps_info.erase(it);
-					continue;
-				}
-				p_send->connect(it->first);
-				p_send->associate(it->first, it->second);
-				p_send->send_by_path(it->first,
-					construct_packet(code,std::move(args)));
-				it = apps_info.erase(it);
-				continue;
-			}
-			if(p_send->is_conn_by_path(it->first)){
-				//delete if p_send allready connected to this path
-				it = apps_info.erase(it);
-				continue;
-			}
-			it++;
+		auto it = apps_info.find(name);
+		if(it == apps_info.end()){
+			//app with this name wasn't found
+			apps_info.clear();
+			return;
 		}
+		if(!p_send->is_conn_by_path(it->second)){
+			p_send->connect(it->second);
+			p_send->associate(it->second, it->first);
+		}
+		p_send->send_by_path(it->second, construct_packet(code,std::move(args)));
 	}else{
 		p_send->send_by_name(name, construct_packet(code,std::move(args)));
 	}
+	apps_info.clear();
 }
 
 void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
@@ -283,11 +275,14 @@ void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
 			const auto name = subdir_file->get_name();
 			if(name != p_lis_name)//it's not p_lis socket
 				continue;
-			if(!p_send->is_conn_by_path(path))
-				p_send->connect(path);
 			const packet p = construct_packet(code, args);
-			p_send->send_by_path(path, p);
-			p_send->disconn_by_path(path);
+			if(!p_send->is_conn_by_path(path)){
+				p_send->connect(path);
+				p_send->send_by_path(path, p);
+				p_send->disconn_by_path(path);
+			}else{
+				p_send->send_by_path(path, p);
+			}
 		}
 	}
 }

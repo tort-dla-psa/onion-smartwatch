@@ -28,7 +28,7 @@ protected:
 	void throw_ex(const std::string &mes);
 	void cb_ask_info(const packet &p);
 	void cb_tell_info(const packet &p);
-	std::vector<std::pair<std::string, std::string>> apps_info;
+	std::map<std::string, std::string> apps_info;//[name] = path
 	packet construct_packet(API_CALL code, const std::vector<std::string> &args);
 	sptr<watchlib> this_ptr;
 public:
