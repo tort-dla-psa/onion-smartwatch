@@ -68,21 +68,22 @@ void exec_func_args(const std::string &path, const std::vector<std::string> &arg
 }
 void exec_func(const std::string &path){
 	pid_t pid = fork();
-	if(pid == 0){
+	if(pid == 0){ //child
+		//no output to stdout
 		int fd = open("/dev/null", O_WRONLY);
 		dup2(fd, 1);
 		dup2(fd, 2);
 		char** args = new char*[1];
 		args[0] = nullptr;
 		::execv(path.c_str(), args);
-	}else if(pid > 0){
+	}else if(pid > 0){ //main thread
 		return;
 	}else{
 		throw_ex("can't fork");
 	}
 }
 
-void launch(std::string path){
+void launch(const std::string &path){
 	stat_op st_op;
 	if(!st_op.set_path(path)){
 		throw std::runtime_error("stat error on " + path + 
@@ -98,7 +99,6 @@ void launch(std::string path){
 	}
 	exec_func(path);
 }
-
 
 class form_clock:public imagebox{
 	struct arrow{
@@ -133,7 +133,9 @@ public:
 		end_requested = true;
 		if(update_thr->joinable())
 			update_thr->join();
-		delete H, M, S;
+		delete H;
+		delete M;
+		delete S;
 	}
 	void update_time(){
 		graphics::drawer dr;
@@ -219,28 +221,8 @@ class myform:public binform{
 			c->get_y() - c->get_h()/2,
 			c->get_image(), img);
 	}
-public:
-	myform(const unsigned int w,
-		const unsigned int h)
-		:binform(w,h)
-	{
-		end_requested = false;
-		drawer d;
-		c = std::make_shared<cursor>(0,0,5,5);
-		drv.init();
-	}
-	~myform(){
-	}
-	void draw(){
-		//TODO: fix this monstrosity
-		draw_img(this->img.get());
-		byte_image* byte_img = binfont::bit_img_to_byte_img(this->img.get());
-		const std::vector<char> bytes = byte_img->get_pixels();
-		char* begin = (char*)&bytes[0];
-		drv.draw((uint8_t*)begin, bytes.size());
-		delete byte_img;
-	}
-	void loop(){
+	std::thread loop_thr;
+	void loop_func(){
 		sptr<bit_image> img = this->img;
 		while(!end_requested){
 			bool redraw = false;
@@ -291,24 +273,50 @@ public:
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
 	}
+public:
+	myform(const unsigned int w,
+		const unsigned int h)
+		:binform(w,h)
+	{
+		end_requested = false;
+		drawer d;
+		c = std::make_shared<cursor>(0,0,5,5);
+		drv.init();
+	}
+	~myform(){
+		end_requested = true;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		if(loop_thr.joinable()){
+			loop_thr.join();
+		}
+	}
+	void draw(){
+		//TODO: fix this monstrosity
+		draw_img(this->img.get());
+		byte_image* byte_img = binfont::bit_img_to_byte_img(this->img.get());
+		const std::vector<char> bytes = byte_img->get_pixels();
+		char* begin = (char*)&bytes[0];
+		drv.draw((uint8_t*)begin, bytes.size());
+		delete byte_img;
+	}
+	void loop(){
+		loop_thr = std::thread(&myform::loop_func, this);
+	}
 	void move_cursor_dx(int dx){
-		events_mutex.lock();
 		clear_cursor();
 		c->move_dx(dx);
 		draw_cursor();
-		events_mutex.unlock();
 	}
 	void move_cursor_dy(int dy){
-		events_mutex.lock();
 		clear_cursor();
 		c->move_dy(dy);
 		draw_cursor();
-		events_mutex.unlock();
 	}
 	void request_end(){
 		end_requested = true;
 	}
 	void cb_key_press(const packet &p){
+		events_mutex.lock();
 		const char c = p.get_args()[0][0];
 		if(c == 'a'){
 			move_cursor_dx(-1);
@@ -321,15 +329,13 @@ public:
 		}else if(c == 'q'){
 			request_end();
 		}
+		events_mutex.unlock();
 	}
 };
 
 int main(){
 	sptr<myform> form = sptr<myform>(new myform(app_w, app_h));
-	watchlib lib_obj("interface");
-	lib_obj.init();
-	lib_obj.set_form(form);
-	lib_obj.send_log("init succseed", API_CALL::LOG_send_info);
+	//lib_obj.set_form(form);
 
 	sptr<form_clock> clk(new form_clock(20, 20));
 	form->add_element(clk);
@@ -337,7 +343,12 @@ int main(){
 	sptr<label> lbl(new label("hi"));
 	form->add_element(lbl);
 	lbl->move(clk->get_x() + clk->get_w() + 1, 0);
-	lib_obj.add_callback(API_CALL::UI_key_pressed, &myform::cb_key_press, form);
-	launch(watches_path+"bin/companion-server/companion-server");
+	//launch(watches_path+"bin/companion-server/companion-server");
 	form->loop();
+
+	watchlib lib_obj("interface");
+	lib_obj.init();
+	lib_obj.send_log("init succseed", API_CALL::LOG_send_info);
+	lib_obj.add_callback(API_CALL::UI_key_pressed, &myform::cb_key_press, form);
+	lib_obj.start();
 }
