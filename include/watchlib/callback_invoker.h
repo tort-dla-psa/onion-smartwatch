@@ -27,6 +27,9 @@ public:
 	void add_callback(API_CALL code, void(obj::*cb)(const packet&), sptr<obj> o){
 		mp[code] = std::bind(cb, o, std::placeholders::_1);
 	}
+	void add_callback(API_CALL code, std::function<void(const packet &p)>f){
+		mp[code] = f;
+	}
 	void delete_callback(API_CALL code, void(*cb)(const packet&)) = delete;
 	template<class obj>
 	void delete_callback(API_CALL code, void(obj::*cb)(const packet&), sptr<obj> o) = delete;

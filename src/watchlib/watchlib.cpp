@@ -24,7 +24,6 @@ watchlib::watchlib(const std::string &name)
 	init_status = false;
 	app_pid = -1;
 	appform = nullptr;
-	this_ptr = sptr<watchlib>(this);
 }
 
 watchlib::~watchlib(){
@@ -44,7 +43,7 @@ void watchlib::send_log(const std::string &mes, API_CALL LOG_api_call){
 	{
 		return;
 	}
-	send("logger", LOG_api_call, { "watchlib", mes });
+	send("logger", LOG_api_call, { mes });
 }
 
 packet watchlib::construct_packet(API_CALL code, const std::vector<std::string> &args){
@@ -164,8 +163,14 @@ void watchlib::init(){
 	try{
 		init_dir();
 		init_ipc();
-		auto self_ptr = shared_from_this();
-		invkr->add_callback(API_CALL::tell_info, &watchlib::cb_ask_info, self_ptr);
+		invkr->add_callback(API_CALL::tell_info,
+			[this](const packet &p){
+				cb_ask_info(p);
+			});
+		invkr->add_callback(API_CALL::ask_info,
+			[this](const packet &p){
+				cb_tell_info(p);
+			});
 	}catch(const std::runtime_error &e){
 		//send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
@@ -177,7 +182,6 @@ void watchlib::end(){
 	send_log("ending", API_CALL::LOG_send_info);
 	p_lis->stop();
 	p_lis.reset(nullptr);
-	p_send.reset(nullptr);
 
 	dir_op d_op;
 	file_op f_op;
@@ -201,6 +205,7 @@ void watchlib::end(){
 		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
+	p_send.reset(nullptr);
 	init_status = false;
 }
 

@@ -13,7 +13,7 @@ template<typename T> using uptr = std::unique_ptr<T>;
 
 namespace watches{
 
-class watchlib: public std::enable_shared_from_this<watchlib>{
+class watchlib{
 protected:
 	sptr<binform> appform;
 	uptr<packet_listener> p_lis;
@@ -30,7 +30,6 @@ protected:
 	void cb_tell_info(const packet &p);
 	std::map<std::string, std::string> apps_info;//[name] = path
 	packet construct_packet(API_CALL code, const std::vector<std::string> &args);
-	sptr<watchlib> this_ptr;
 public:
 	watchlib(const std::string &name);
 	~watchlib();
