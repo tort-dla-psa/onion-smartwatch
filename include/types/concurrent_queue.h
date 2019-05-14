@@ -84,6 +84,7 @@ public:
 		while (!m_queue.empty()){
 			m_queue.pop();
 		}
+		m_cv.notify_one();
 	}
 
 	bool exit_requested()const{
