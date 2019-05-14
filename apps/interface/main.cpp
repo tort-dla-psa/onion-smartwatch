@@ -316,6 +316,7 @@ public:
 		end_requested = true;
 	}
 	void cb_key_press(const packet &p){
+		std::cout<<"cb called\n";
 		events_mutex.lock();
 		const char c = p.get_args()[0][0];
 		if(c == 'a'){
@@ -344,7 +345,7 @@ int main(){
 	form->add_element(lbl);
 	lbl->move(clk->get_x() + clk->get_w() + 1, 0);
 	//launch(watches_path+"bin/companion-server/companion-server");
-	form->loop();
+	//form->loop();
 
 	watchlib lib_obj("interface");
 	lib_obj.init();

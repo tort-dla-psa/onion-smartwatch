@@ -97,11 +97,6 @@ packet_listener::~packet_listener(){
 		//I was not stopper, stopping now
 		stop();
 	}
-
-	//removing socket file
-	file_op f_op;
-	f_op.remove(sock);
-	mt.unlock();
 }
 void packet_listener::throw_ex(const std::string &header){
 	std::string mes = std::string("packet_listener: ")+ header;
@@ -195,6 +190,9 @@ void packet_listener::stop(){
 	}
 	clients.clear();
 	s_op.close(sock);
+	//removing socket file
+	file_op f_op;
+	f_op.remove(sock);
 	mt.unlock();
 }
 int packet_listener::get_processing_sleep()const{

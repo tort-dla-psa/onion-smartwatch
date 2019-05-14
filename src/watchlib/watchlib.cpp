@@ -54,7 +54,14 @@ void watchlib::cb_ask_info(const packet &p){
 	//tell this app's info to other app
 	const std::string path = watches_path + std::to_string(p.get_pid()) +
 		"/" + p_lis_name;
-	p_send->send_by_path(path, construct_packet(API_CALL::tell_info, {}));
+	std::cout<<"app "<<p.get_name()<<" asked info\n";
+	if(!p_send->is_conn_by_path(path)){
+		p_send->connect(path);
+		p_send->send_by_path(path, construct_packet(API_CALL::tell_info, {}));
+		p_send->disconn_by_path(path);
+	}else{
+		p_send->send_by_path(path, construct_packet(API_CALL::tell_info, {}));
+	}
 }
 
 void watchlib::cb_tell_info(const packet &p){
@@ -62,6 +69,7 @@ void watchlib::cb_tell_info(const packet &p){
 	const auto name = p.get_name();
 	const std::string path = watches_path + std::to_string(p.get_pid()) +
 		"/" + p_lis_name;
+	std::cout<<"app told it's info:"<<name<<"\n";
 	/*const auto it = std::find_if(apps_info.begin(), apps_info.end(),
 		[&](const auto &pair){ return (pair.first == path); });
 	if(it == apps_info.end()){*/
@@ -149,10 +157,10 @@ void watchlib::init_ipc(){
 		auto packets_queue = std::make_shared<types::concurrent_queue<packet>>();
 		p_lis = std::make_unique<packet_listener>(p_lis_path, max_cli, proc_sleep,
 				packets_queue);
-		p_lis->start();
 		p_send = std::make_unique<packet_sender>();
 		invkr = std::make_unique<callback_invoker>(packets_queue,
 				std::chrono::milliseconds(100));
+		p_lis->start();
 	}catch(const std::runtime_error &e){
 		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
@@ -163,11 +171,11 @@ void watchlib::init(){
 	try{
 		init_dir();
 		init_ipc();
-		invkr->add_callback(API_CALL::tell_info,
+		invkr->add_callback(API_CALL::ask_info,
 			[this](const packet &p){
 				cb_ask_info(p);
 			});
-		invkr->add_callback(API_CALL::ask_info,
+		invkr->add_callback(API_CALL::tell_info,
 			[this](const packet &p){
 				cb_tell_info(p);
 			});
@@ -181,7 +189,7 @@ void watchlib::init(){
 void watchlib::end(){
 	send_log("ending", API_CALL::LOG_send_info);
 	p_lis->stop();
-	p_lis.reset(nullptr);
+	invkr->end();
 
 	dir_op d_op;
 	file_op f_op;
@@ -197,15 +205,13 @@ void watchlib::end(){
 		d = d_op.open(watches_path);
 		int files = d_op.count_files(d)-2;
 		if(files == 1 && f_op.check(lastpid_path)){
-			send_log("cleaning watches dir",
-				API_CALL::LOG_send_info);
+			send_log("cleaning watches dir", API_CALL::LOG_send_info);
 			d_op.remove(d);
 		}
 	}catch(const std::runtime_error &e){
 		send_log(e.what(), API_CALL::LOG_send_error);
 		throw_ex(e.what());
 	}
-	p_send.reset(nullptr);
 	init_status = false;
 }
 
@@ -234,6 +240,7 @@ void watchlib::send(const std::string &name, API_CALL code,
 	//	to each path with desired name;
 	//5.add path-name association to p_send;
 	if(!p_send->is_conn_by_name(name)){
+		std::cout<<"broadcasting to get info\n";
 		broadcast(API_CALL::ask_info, {});
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));//wait for apps
 		auto it = apps_info.find(name);
@@ -242,13 +249,23 @@ void watchlib::send(const std::string &name, API_CALL code,
 			apps_info.clear();
 			return;
 		}
-		if(!p_send->is_conn_by_path(it->second)){
-			p_send->connect(it->second);
-			p_send->associate(it->second, it->first);
+		std::cout<<"app found:"<<it->second<<"\n";
+		try{
+			if(!p_send->is_conn_by_path(it->second)){
+				p_send->connect(it->second);
+				p_send->associate(it->second, it->first);
+			}
+			p_send->send_by_path(it->second,
+				construct_packet(code,std::move(args)));
+		}catch(const std::runtime_error &e){
+			std::cerr<<"error while sending:"<<e.what()<<"\n";
 		}
-		p_send->send_by_path(it->second, construct_packet(code,std::move(args)));
 	}else{
-		p_send->send_by_name(name, construct_packet(code,std::move(args)));
+		try{
+			p_send->send_by_name(name, construct_packet(code,std::move(args)));
+		}catch(const std::runtime_error &e){
+			std::cerr<<"error while sending:"<<e.what()<<"\n";
+		}
 	}
 	apps_info.clear();
 }
@@ -281,12 +298,16 @@ void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
 			if(name != p_lis_name)//it's not p_lis socket
 				continue;
 			const packet p = construct_packet(code, args);
-			if(!p_send->is_conn_by_path(path)){
-				p_send->connect(path);
-				p_send->send_by_path(path, p);
-				p_send->disconn_by_path(path);
-			}else{
-				p_send->send_by_path(path, p);
+			try{
+				if(!p_send->is_conn_by_path(path)){
+					p_send->connect(path);
+					p_send->send_by_path(path, p);
+					p_send->disconn_by_path(path);
+				}else{
+					p_send->send_by_path(path, p);
+				}
+			}catch(const std::runtime_error &e){
+				std::cerr<<"error while sending:"<<e.what()<<"\n";
 			}
 		}
 	}

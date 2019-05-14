@@ -47,7 +47,9 @@ void packet_sender::send_by_path(const std::string &path, const packet &p){
 			const std::string data = p.serialize();
 			data_protocol::send(s_op, sock, data);
 		}catch(std::runtime_error e){
-			throw_ex(std::string("can't send to ")+path+" "+e.what());
+			throw_ex(std::string("can't send to ")+path+
+				" "+e.what()+", disconnecting");
+			disconn_by_path(path);
 		}
 	}
 }
@@ -83,11 +85,13 @@ bool packet_sender::is_conn(const sptr<IO::socket> &listener)const{
 	return false;
 }
 bool packet_sender::is_conn_by_path(const std::string &path)const{
+	//find app with desired path
 	const auto it = std::find_if(listeners.begin(), listeners.end(),
 		[&](const auto &sock){ return (sock->get_path() == path); });
 	return (it != listeners.end());
 }
 bool packet_sender::is_conn_by_name(const std::string &name)const{
+	//find app with desired name
 	const auto it = name_path_pair.find(name);
 	return (it != name_path_pair.end());
 }
