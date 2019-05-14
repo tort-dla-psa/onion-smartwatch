@@ -30,7 +30,7 @@ void packet_listener_client::process_packets(){
 		}
 		got_packets_flag = true;
 		mt.lock();
-		querry.emplace_back(data);
+		queue.emplace_back(data);
 		mt.unlock();
 	}
 	//exit recieving thread loop
@@ -51,9 +51,9 @@ int packet_listener_client::get_id()const{
 bool packet_listener_client::got_packets(){
 	return got_packets_flag;
 }
-std::vector<packet> packet_listener_client::get_querry(){
+std::vector<packet> packet_listener_client::get_queue(){
 	mt.lock();
-	const auto bak = std::move(querry);
+	const auto bak = std::move(queue);
 	got_packets_flag = false;
 	mt.unlock();
 	return bak;
@@ -74,10 +74,13 @@ bool packet_listener_client::get_connected(){
 
 //============packet_listener==============//
 packet_listener::packet_listener(const std::string &path, const int max_clients,
-		const int proc_sleep)
+		const int proc_sleep,
+		const std::shared_ptr<types::concurrent_queue<packet>> packets_queue)
 {
 	quit_requested = false;
 	this->proc_sleep = proc_sleep;
+	this->packets_queue = packets_queue;
+	this->max_clients = max_clients;
 	sock = nullptr;
 	accept_thread = process_thread = nullptr;
 	//creating socket
@@ -94,11 +97,6 @@ packet_listener::~packet_listener(){
 		//I was not stopper, stopping now
 		stop();
 	}
-
-	//removing socket file
-	file_op f_op;
-	f_op.remove(sock);
-	mt.unlock();
 }
 void packet_listener::throw_ex(const std::string &header){
 	std::string mes = std::string("packet_listener: ")+ header;
@@ -131,15 +129,17 @@ void packet_listener::process_func(){
 	while(!quit_requested){
 		//sleep for CPU saving
 		std::this_thread::sleep_for(std::chrono::milliseconds(proc_sleep));
-		std::vector<packet> querry;
-		mt.lock();
+		std::vector<packet> queue;
 		//get all packets
+		mt.lock();
 		auto it = clients.begin();
 		while(it != clients.end()){
 			sptr<packet_listener_client> cli = (*it);
 			if(cli->got_packets()){
-				const std::vector<packet> packets = cli->get_querry();
-				querry.insert(querry.end(), packets.begin(), packets.end());
+				std::vector<packet> packets = cli->get_queue();
+				queue.reserve(queue.size() + packets.size());
+				std::move(packets.begin(), packets.end(),
+					std::back_inserter(queue));
 			}
 			if(!cli->get_connected()){
 				//destroing client
@@ -148,13 +148,10 @@ void packet_listener::process_func(){
 			}
 			it++;
 		}
-		for(const auto &p:querry){
-			std::map<API_CALL, cb>::iterator it = mp.find(p.get_val());
-			if(it != mp.end()){
-				(it->second)(p);
-			}
-		}
 		mt.unlock();
+		for(const auto &p:queue){
+			packets_queue->push(p);
+		}
 	}
 }
 void packet_listener::start(){
@@ -193,6 +190,9 @@ void packet_listener::stop(){
 	}
 	clients.clear();
 	s_op.close(sock);
+	//removing socket file
+	file_op f_op;
+	f_op.remove(sock);
 	mt.unlock();
 }
 int packet_listener::get_processing_sleep()const{

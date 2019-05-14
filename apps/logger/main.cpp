@@ -1,8 +1,7 @@
 #include <iostream>
-#include <thread>
-#include "file.h"
-#include "file_op.h"
-#include "watchlib.h"
+#include <thread> //sleep
+#include "API_CALLS.h" //API
+#include "watchlib.h" //lib, obviously
 
 using namespace watches;
 using namespace IO;
@@ -30,7 +29,5 @@ int main(const int argc, char* argv[]){
 	lib_obj.add_callback(API_CALL::LOG_send_debug, cb_debug);
 	lib_obj.add_callback(API_CALL::LOG_send_error, cb_error);
 	lib_obj.add_callback(API_CALL::request_end, cb_end);
-	while(!end_requested){
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
+	lib_obj.start();
 }
