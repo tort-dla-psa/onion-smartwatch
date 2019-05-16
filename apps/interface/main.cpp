@@ -21,12 +21,11 @@
 #include "binfont.h"
 #include "clock.h"
 
-#define app_w 70
-#define app_h 20
-
 using namespace watches;
 using namespace IO;
+using uint = unsigned int;
 const std::string watches_path("/home/tort/gits/onion-smartwatch/");
+const uint app_w = 100, app_h = 64;
 
 std::vector<sptr<std::thread>> children;
 
@@ -36,11 +35,11 @@ void throw_ex(const std::string &mes){
 }
 
 inline void draw_img(image* img){
-	const unsigned int w = img->get_w();
-	const unsigned int h = img->get_h();
+	const uint w = img->get_w();
+	const uint h = img->get_h();
 
-	for(unsigned int i=0; i<h; i++){
-		for(unsigned int j=0; j<w; j++){
+	for(uint i=0; i<h; i++){
+		for(uint j=0; j<w; j++){
 			std::cout<<(img->get_pixel(j,i)? '#':'_');
 		}
 		std::cout<<'\n';
@@ -92,7 +91,7 @@ class cursor:public imagebox{
 	int prev_x, prev_y;
 	sptr<bit_image> clear_img;
 public:
-	cursor(int x, int y, unsigned int w, unsigned int h)
+	cursor(int x, int y, uint w, uint h)
 		:imagebox(w, h)
 	{
 		move(x, y);
@@ -107,13 +106,13 @@ public:
 		prev_x = x;
 		x += delta;
 		move(x, y);
-		set_changed(true);
+		//set_changed(true);
 	}
 	void move_dy(int delta){
 		prev_y = y;
 		y += delta;
 		move(x, y);
-		set_changed(true);
+		//set_changed(true);
 	}
 	int get_prev_x(){
 		return prev_x;
@@ -149,15 +148,16 @@ class myform:public binform{
 	void loop_func(){
 		sptr<bit_image> img = this->img;
 		while(!end_requested){
-			bool redraw = false;
+			//bool redraw = false;
 			events_mutex.lock();
 			const int c_x = c->get_x(),
 			      c_y = c->get_y(),
 			      c_x2 = c->get_x() + c->get_w(),
 			      c_y2 = c->get_y() + c->get_h();
-			if(c->get_changed()){
-				clear_cursor();
-			}
+			//if(c->get_changed()){
+			//	clear_cursor();
+			//}
+			/*
 			for(const auto &form_el:binform::elements){
 				const int f_el_x = form_el->get_x();
 				const int f_el_y = form_el->get_y();
@@ -190,20 +190,39 @@ class myform:public binform{
 				redraw = true;
 				c->set_changed(false);
 			}
-			events_mutex.unlock();
-			if(redraw){
-				draw_img(this->img.get());
+			*/
+			for(auto &l:layers){
+				l->update();
+				d.draw_image(0,0,l->get_image(), img);
 			}
+			events_mutex.unlock();
+			//if(redraw){
+				draw_img(this->img.get());
+			//}
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
 	}
 public:
-	myform(const unsigned int w, const unsigned int h)
+	myform(const uint w, const uint h)
 		:binform(w,h)
 	{
 		end_requested = false;
-		drawer d;
 		c = std::make_shared<cursor>(0,0,5,5);
+
+		sptr<layer> cursor_layer(new layer(w, h));
+		cursor_layer->add_element(c);
+		add_layer(cursor_layer);
+
+		sptr<layer> ui_layer0(new layer(w,h));
+		sptr<form_clock> clk(new form_clock(app_h, app_h));
+		clk->move(0, 0);
+		ui_layer0->add_element(clk);
+
+		sptr<label> lbl(new label("hi"));
+		ui_layer0->add_element(lbl);
+		lbl->move(w - lbl->get_w(), 0);
+		add_layer(ui_layer0);
+
 		drv.init();
 	}
 	~myform(){
@@ -262,14 +281,7 @@ void cb_key_press(const packet &p){
 
 int main(){
 	form = sptr<myform>(new myform(app_w, app_h));
-	//lib_obj.set_form(form);
 
-	sptr<form_clock> clk(new form_clock(20, 20));
-	form->add_element(clk);
-	clk->move(0, 0);
-	sptr<label> lbl(new label("hi"));
-	form->add_element(lbl);
-	lbl->move(clk->get_x() + clk->get_w() + 1, 0);
 	//launch(watches_path+"bin/companion-server/companion-server");
 	form->loop();
 
