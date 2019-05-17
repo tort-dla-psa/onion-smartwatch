@@ -5,7 +5,6 @@
 #include <algorithm>
 #include "imagebox.h"
 
-
 float percent(int var, int percent){
 	return double(var)/100.0*percent;
 }
@@ -31,10 +30,10 @@ class form_clock:public imagebox{
 					(int)(d1.y + h*std::sin(rad))},
 				d4 = {(int)(d2.x + h*std::cos(rad)),
 					(int)(d2.y + h*std::sin(rad))};
-			dr.draw_line(d1, d2, img);
-			dr.draw_line(d2, d4, img);
-			dr.draw_line(d1, d3, img);
-			dr.draw_line(d3, d4, img);
+			dr.draw_line(d1, d2, color::white, img);
+			dr.draw_line(d2, d4, color::white, img);
+			dr.draw_line(d1, d3, color::white, img);
+			dr.draw_line(d3, d4, color::white, img);
 		}
 	};
 	arrow *H,*M,*S;
@@ -70,11 +69,14 @@ public:
 		while(!end_requested){
 			time_t now = time(0);
 			tm *ltm = localtime(&now);
-			H->update(ltm->tm_hour%12, 12);
-			M->update(ltm->tm_min, 60);
-			S->update(ltm->tm_sec, 60);
+			const int hours = ltm->tm_hour%12,
+			      mins = ltm->tm_min,
+			      secs = ltm->tm_sec;
+			H->update(hours*60*60, 12*60*60);
+			M->update(mins*60, 60*60);
+			S->update(secs, 60);
 			draw_mt.lock();
-			dr.fill_image(false, temp_img);
+			dr.fill_image(color::black, temp_img);
 			S->draw(dr, temp_img);
 			M->draw(dr, temp_img);
 			H->draw(dr, temp_img);

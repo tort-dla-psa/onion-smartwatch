@@ -3,12 +3,7 @@
 #include <thread>
 #include <mutex>
 #include <sys/socket.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
-#include <stdexcept>
-#include "API_CALLS.h"
-#include "data_protocol.h"
 #include "stat_op.h"
 #include "binform.h"
 #include "graphics.h"
@@ -20,6 +15,7 @@
 #include "oled-exp.h"
 #include "binfont.h"
 #include "clock.h"
+#include "tools.h"
 
 using namespace watches;
 using namespace IO;
@@ -97,8 +93,8 @@ public:
 		move(x, y);
 		drawer d;
 		sptr<bit_image> temp = std::static_pointer_cast<bit_image>(get_inner_img());
-		d.draw_line(0,h/2,w-1,h/2,temp);
-		d.draw_line(h/2,0,h/2,w-1,temp);
+		d.draw_line(0, h/2, w-1, h/2, color::white, temp);
+		d.draw_line(h/2, 0, h/2, w-1, color::white, temp);
 		clear_img = std::make_shared<bit_image>(w,h);
 	}
 	~cursor(){}
@@ -125,6 +121,7 @@ public:
 	}
 };
 
+
 class myform:public binform{
 	std::vector<event> events;
 
@@ -148,57 +145,17 @@ class myform:public binform{
 	void loop_func(){
 		sptr<bit_image> img = this->img;
 		while(!end_requested){
-			//bool redraw = false;
 			events_mutex.lock();
-			const int c_x = c->get_x(),
-			      c_y = c->get_y(),
-			      c_x2 = c->get_x() + c->get_w(),
-			      c_y2 = c->get_y() + c->get_h();
-			//if(c->get_changed()){
-			//	clear_cursor();
-			//}
-			/*
-			for(const auto &form_el:binform::elements){
-				const int f_el_x = form_el->get_x();
-				const int f_el_y = form_el->get_y();
-				const int f_el_x2 = f_el_x + form_el->get_w();
-				const int f_el_y2 = f_el_y + form_el->get_h();
-				if(f_el_x > c_x2 ||
-					f_el_y > c_y2 ||
-					f_el_x2 < c_x ||
-					f_el_y2 < c_y)
-				{
-					if(form_el->get_changed()){
-						form_el->update();
-						d.draw_image(f_el_x, f_el_y,
-							form_el->get_image(), img);
-						redraw = true;
-					}
-					form_el->set_changed(false);
-					continue;
-				}
-				if(form_el->get_changed() | c->get_changed()){
-					form_el->update();
-					d.draw_image(f_el_x, f_el_y,
-						form_el->get_image(), img);
-					redraw = true;
-					form_el->set_changed(false);
-				}
-			}
-			if(c->get_changed()){
-				draw_cursor();
-				redraw = true;
-				c->set_changed(false);
-			}
-			*/
-			for(auto &l:layers){
+			for(auto &l:reverse_wrapper(layers)){
 				l->update();
-				d.draw_image(0,0,l->get_image(), img);
+				const auto elements = l->get_elements();
+				for(const auto &el:elements){
+					d.draw_image(el->get_x(), el->get_y(),
+						el->get_image(), img);
+				}
 			}
 			events_mutex.unlock();
-			//if(redraw){
-				draw_img(this->img.get());
-			//}
+			draw_img(this->img.get());
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
 	}
@@ -235,11 +192,9 @@ public:
 	void draw(){
 		//TODO: fix this monstrosity
 		draw_img(this->img.get());
-		byte_image* byte_img = binfont::bit_img_to_byte_img(this->img.get());
-		const std::vector<char> bytes = byte_img->get_pixels();
-		char* begin = (char*)&bytes[0];
-		drv.draw((uint8_t*)begin, bytes.size());
-		delete byte_img;
+		const auto byte_img = binfont::to_byte_img(this->img);
+		const auto bytes = byte_img->get_pixels();
+		drv.draw((uint8_t*)&bytes[0], bytes.size());
 	}
 	void loop(){
 		loop_thr = std::thread(&myform::loop_func, this);
