@@ -29,7 +29,5 @@ int main(const int argc, char* argv[]){
 	lib_obj.add_callback(API_CALL::LOG_send_debug, cb_debug);
 	lib_obj.add_callback(API_CALL::LOG_send_error, cb_error);
 	lib_obj.add_callback(API_CALL::request_end, cb_end);
-	while(!end_requested){
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
+	lib_obj.start();
 }

@@ -23,7 +23,7 @@ libwatches_flags := --shared -fPIC -lpthread
 libwatches_s := $(srcdir)/$(libwatches)/*.cpp
 libwatches_h := $(incdir)/$(libwatches)
 libwatches_files := $(libwatches_s) $(libwatches_h)/*.h
-libwatches_inc := -I$(libwatches_h) -I$(submodsdir)/UnixIO-cpp/include/ \
+libwatches_inc := -I$(libwatches_h) -I$(incdir)/types/ -I$(submodsdir)/UnixIO-cpp/include/ \
 		-I$(submodsdir)/binforms/include/
 libwatches_trg := $(libdir)/libonionwatch.so
 libwatches_dep := $(IO) $(binforms)
@@ -40,7 +40,7 @@ app_ui_dep := $(libwatches_trg) $(i2c)
 
 #companion-server
 companion_serv := companion-server
-companion_serv_flags := -Llib -lonionwatch -lunixiocpp
+companion_serv_flags := -Llib -lonionwatch -lunixiocpp -lpthread
 companion_serv_s := $(appsdir)/$(companion_serv)/*.cpp
 companion_serv_h := $(appsdir)/$(companion_serv)
 companion_serv_files := $(companion_serv_s)
@@ -99,7 +99,7 @@ $(i2c):
 
 $(libwatches_trg): $(libwatches_files) $(libwatches_dep)
 	@echo "compile $< $@"
-	@$(cxx) $(cxxflags) $(libwatches_s) $(libwatches_inc) $(libwatches_flags) -o $@
+	$(cxx) $(cxxflags) $(libwatches_s) $(libwatches_inc) $(libwatches_flags) -o $@
 
 $(app_ui_trg): $(app_ui_files) $(app_ui_dep)
 	@echo "compile $< $@"
