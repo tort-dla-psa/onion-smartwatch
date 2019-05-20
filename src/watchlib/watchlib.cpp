@@ -23,7 +23,6 @@ watchlib::watchlib(const std::string &name)
 {
 	init_status = false;
 	app_pid = -1;
-	appform = nullptr;
 }
 
 watchlib::~watchlib(){
@@ -49,6 +48,18 @@ void watchlib::send_log(const std::string &mes, API_CALL LOG_api_call){
 packet watchlib::construct_packet(API_CALL code, const std::vector<std::string> &args){
 	return packet(code, app_pid, unix_pid, name, args);
 }
+
+#ifdef UI_BINFORMS
+void watchlib::cb_UI_cursor_press(const packet &p){
+	if(ui_ev_man){
+		const auto args = p.get_args();
+		const int x = std::stoi(args[0]);
+		const int y = std::stoi(args[1]);
+		const int id = std::stoi(args[2]);
+		ui_ev_man->process_event(x,y,id);
+	}
+}
+#endif
 
 void watchlib::cb_ask_info(const packet &p){
 	//tell this app's info to other app
@@ -81,8 +92,8 @@ void watchlib::init_dir(){
 	file_op f_op;
 	dir_op d_op;
 
-	sptr<file> lock_f = nullptr, lastpid_f = nullptr;
-	sptr<dir> process_d = nullptr;
+	std::shared_ptr<file> lock_f = nullptr, lastpid_f = nullptr;
+	std::shared_ptr<dir> process_d = nullptr;
 	std::string dirname;
 
 	//check and create watches dir
@@ -199,7 +210,7 @@ void watchlib::end(){
 	send_log(std::string("recursively removing app's dir:")+dirpath,
 		API_CALL::LOG_send_info);
 	try{
-		sptr<dir> d = d_op.open(dirpath);
+		std::shared_ptr<dir> d = d_op.open(dirpath);
 		d_op.remove(d);
 		//check if it's the last app
 		d = d_op.open(watches_path);
@@ -215,13 +226,11 @@ void watchlib::end(){
 	init_status = false;
 }
 
-void watchlib::set_form(sptr<binform> appform){
-	this->appform = appform;
+#ifdef UI_BINFORMS
+void watchlib::set_form(std::shared_ptr<binform> appform){
+	ui_ev_man = std::make_unique<ui_event_manager>(appform);
 }
-
-sptr<binform> watchlib::get_form()const{
-	return appform;
-}
+#endif
 
 void watchlib::send(const int pid, API_CALL code, const std::vector<std::string> &args){
 	const std::string path = watches_path + std::to_string(pid) + "/" + p_lis_name;
