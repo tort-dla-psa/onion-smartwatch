@@ -107,7 +107,7 @@ $(app_ui_trg): $(app_ui_files) $(app_ui_dep)
 	@$(cxx) $(cxxflags) $(app_ui_s) $(app_ui_inc) \
 		$(submodsdir)/i2c-exp-driver/build/*.o \
 		$(submodsdir)/i2c-exp-driver/build/lib/*.o \
-		$(app_ui_flags) -o $@
+		$(app_ui_flags) -o $@ -DUI_BINFORMS
 
 $(companion_serv_trg): $(companion_serv_files) $(companion_serv_dep)
 	@echo "compile $< $@"

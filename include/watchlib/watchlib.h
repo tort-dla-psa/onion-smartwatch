@@ -8,7 +8,10 @@
 #include "packet.h"
 
 #ifdef UI_BINFORMS
-	#include "ui_event_manager.h"
+namespace binforms{
+class binform;
+}
+#include "ui_event_manager.h"
 #endif
 
 namespace watches{
@@ -41,7 +44,7 @@ public:
 	void end();
 
 #ifdef UI_BINFORMS
-	void set_form(std::shared_ptr<binform> form);
+	void set_form(std::shared_ptr<binforms::binform> form);
 #endif
 
 	void add_callback(API_CALL code, std::function<void(const packet &)> cb){

@@ -4,6 +4,9 @@
 #include <cmath>
 #include <algorithm>
 #include "imagebox.h"
+#include "graphics.h"
+
+using namespace binforms;
 
 float percent(int var, int percent){
 	return double(var)/100.0*percent;
@@ -20,9 +23,9 @@ class form_clock:public imagebox{
 		}
 		arrow(int x, int y, int w, int h):x(x),y(y),w(w),h(h){}
 
-		void draw(graphics::drawer &dr, sptr<bit_image> &img){
+		void draw(drawer &dr, sptr<bit_image> &img){
 			const float pi = 3.1415;
-			graphics::dot d1 = {(int)(x + w/2*std::cos(rad-pi/4)),
+			dot d1 = {(int)(x + w/2*std::cos(rad-pi/4)),
 					(int)(y + w/2*std::sin(rad-pi/4))},
 				d2 = {(int)(x + w/2*std::cos(rad+pi/4)),
 					(int)(y + w/2*std::sin(rad+pi/4))},
@@ -63,7 +66,7 @@ public:
 		delete S;
 	}
 	void update_time(){
-		graphics::drawer dr;
+		drawer dr;
 		sptr<bit_image> temp_img = 
 			std::static_pointer_cast<bit_image>(get_inner_img());
 		while(!end_requested){

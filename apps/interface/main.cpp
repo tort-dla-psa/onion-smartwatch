@@ -19,6 +19,8 @@
 
 using namespace watches;
 using namespace IO;
+using namespace binforms;
+
 using uint = unsigned int;
 const std::string watches_path("/home/tort/gits/onion-smartwatch/");
 const uint app_w = 100, app_h = 64;
