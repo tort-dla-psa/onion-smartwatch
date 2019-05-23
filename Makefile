@@ -19,7 +19,7 @@ i2c := $(blddir)/i2c.flag
 
 #libwatches
 libwatches := watchlib
-libwatches_flags := --shared -fPIC -lpthread
+libwatches_flags := --shared -fPIC -lpthread -DUI_BINFORMS
 libwatches_s := $(srcdir)/$(libwatches)/*.cpp
 libwatches_h := $(incdir)/$(libwatches)
 libwatches_files := $(libwatches_s) $(libwatches_h)/*.h
@@ -30,7 +30,7 @@ libwatches_dep := $(IO) $(binforms)
 
 #interface
 app_ui := interface
-app_ui_flags := -Llib -lbinforms -lonionwatch -lunixiocpp -lpthread
+app_ui_flags := -Llib -lbinforms -lonionwatch -lunixiocpp -lpthread -DUI_BINFORMS
 app_ui_s := $(appsdir)/$(app_ui)/*.cpp
 app_ui_h := $(appsdir)/$(app_ui) 
 app_ui_files := $(app_ui_s) #$(appsdir)/$(app_ui)/*.h
@@ -40,7 +40,8 @@ app_ui_dep := $(libwatches_trg) $(i2c)
 
 #companion-server
 companion_serv := companion-server
-companion_serv_flags := -Llib -lonionwatch -lunixiocpp -lpthread
+companion_serv_flags := -Llib -lbinforms -lonionwatch -lunixiocpp -lpthread
+# TODO:separete UI and non-UI libonionwatch
 companion_serv_s := $(appsdir)/$(companion_serv)/*.cpp
 companion_serv_h := $(appsdir)/$(companion_serv)
 companion_serv_files := $(companion_serv_s)
@@ -60,13 +61,23 @@ cli_mock_dep := $(IO)
 
 #logger
 lggr := logger
-lggr_flags := -Llib -lonionwatch -lunixiocpp
+lggr_flags := -Llib -lbinforms -lonionwatch -lunixiocpp
 lggr_s := $(appsdir)/$(lggr)/*.cpp
 lggr_h := $(appsdir)/$(lggr)
 lggr_files := $(lggr_s)
 lggr_inc := -I$(lggr_h) $(libwatches_inc)
 lggr_trg := $(bindir)/$(lggr)/$(lggr)
 lggr_dep := $(libwatches_trg)
+
+#calc
+calc := calc
+calc_flags := -Llib -lbinforms -lonionwatch -lunixiocpp -DUI_BINFORMS
+calc_s := $(appsdir)/$(calc)/*.cpp
+calc_h := $(appsdir)/$(calc)
+calc_files := $(calc_s)
+calc_inc := -I$(calc_h) $(libwatches_inc)
+calc_trg := $(bindir)/$(calc)/$(calc)
+calc_dep := $(libwatches_trg) $(interface)
 
 #hello-world
 app_hello := hello-world
@@ -107,7 +118,7 @@ $(app_ui_trg): $(app_ui_files) $(app_ui_dep)
 	@$(cxx) $(cxxflags) $(app_ui_s) $(app_ui_inc) \
 		$(submodsdir)/i2c-exp-driver/build/*.o \
 		$(submodsdir)/i2c-exp-driver/build/lib/*.o \
-		$(app_ui_flags) -o $@ -DUI_BINFORMS
+		$(app_ui_flags) -o $@ 
 
 $(companion_serv_trg): $(companion_serv_files) $(companion_serv_dep)
 	@echo "compile $< $@"
@@ -133,14 +144,20 @@ $(lggr_trg): $(lggr_files) $(lggr_dep)
 	@mkdir -p $(bindir)/$(lggr)
 	@$(cxx) $(cxxflags) $(lggr_s) $(lggr_inc) $(lggr_flags) -o $@
 
+$(calc_trg): $(calc_files) $(calc_dep)
+	@echo "compile $< $@"
+	@mkdir -p $(bindir)/$(calc)
+	@$(cxx) $(cxxflags) $(calc_s) $(calc_inc) $(calc_flags) -o $@
+
 $(libwatches): $(libwatches_trg)
 $(app_ui): $(app_ui_trg)
 # $(app_hello): $(app_hello_trg)
 $(cli_mock): $(cli_mock_trg)
 $(companion_serv): $(companion_serv_trg)
 $(lggr): $(lggr_trg)
+$(calc): $(calc_trg)
 
-all: prepare $(app_ui) $(cli_mock) $(companion_serv) $(lggr) #$(app_hello) 
+all: prepare $(app_ui) $(cli_mock) $(companion_serv) $(lggr) $(calc) 
 
 clean:
 	@rm -rf $(blddir) $(libdir) $(bindir)
