@@ -1,5 +1,4 @@
 #pragma once
-#ifdef UI_BINFORMS
 #include <memory>
 
 namespace binforms{
@@ -16,4 +15,3 @@ public:
 };
 
 }
-#endif

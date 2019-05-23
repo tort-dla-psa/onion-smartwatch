@@ -30,7 +30,9 @@ protected:
 	void throw_ex(const std::string &mes);
 #ifdef UI_BINFORMS
 	std::unique_ptr<ui_event_manager> ui_ev_man;
+	std::shared_ptr<binforms::binform> form;
 	void cb_UI_cursor_press(const packet &p);
+	void cb_UI_ask_image(const packet &p);
 #endif
 	void cb_ask_info(const packet &p);
 	void cb_tell_info(const packet &p);

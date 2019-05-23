@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 #include <unistd.h>
 #include <fcntl.h>
@@ -7,6 +8,11 @@
 #include "file.h"
 #include "file_op.h"
 #include "dir_op.h"
+
+#ifdef UI_BINFORMS
+#include "binform.h"
+#include "image.h"
+#endif
 
 const std::string watches_path = "/tmp/watches/",
 	lock_name = "update_lock",
@@ -17,6 +23,9 @@ const std::string watches_path = "/tmp/watches/",
 
 using namespace watches;
 using namespace IO;
+#ifdef UI_BINFORMS
+using namespace binforms;
+#endif
 
 watchlib::watchlib(const std::string &name)
 	:name(name)
@@ -59,19 +68,25 @@ void watchlib::cb_UI_cursor_press(const packet &p){
 		ui_ev_man->process_event(x,y,id);
 	}
 }
+void watchlib::cb_UI_ask_image(const packet &p){
+	if(form){
+		const auto img_data = form->get_image()->serialize();
+		send(p.get_name(), API_CALL::UI_send_image, {std::move(img_data)});
+	}
+}
 #endif
 
 void watchlib::cb_ask_info(const packet &p){
 	//tell this app's info to other app
-	const std::string path = watches_path + std::to_string(p.get_pid()) +
-		"/" + p_lis_name;
+	const auto path = watches_path + std::to_string(p.get_pid()) + "/" + p_lis_name;
 	std::cout<<"app "<<p.get_name()<<" asked info\n";
+	const auto packet = construct_packet(API_CALL::tell_info, {});
 	if(!p_send->is_conn_by_path(path)){
 		p_send->connect(path);
-		p_send->send_by_path(path, construct_packet(API_CALL::tell_info, {}));
+		p_send->send_by_path(path, std::move(packet));
 		p_send->disconn_by_path(path);
 	}else{
-		p_send->send_by_path(path, construct_packet(API_CALL::tell_info, {}));
+		p_send->send_by_path(path, std::move(packet));
 	}
 }
 
@@ -146,9 +161,15 @@ void watchlib::init_dir(){
 	}
 
 	try{
+		std::ofstream ofs;
+		ofs.open(lastpid_f->get_path(), std::ofstream::out | std::ofstream::trunc);
+		ofs << dirname;
+		ofs.close();
+		/*
 		f_op.clear(lastpid_f);
 		f_op.write(lastpid_f, dirname);
 		f_op.close(lastpid_f);
+		*/
 
 		dirname = std::string(watches_path) + dirname; //creating dir for appication
 		process_d = d_op.create(dirname);
@@ -189,6 +210,10 @@ void watchlib::init(){
 		invkr->add_callback(API_CALL::tell_info,
 			[this](const packet &p){
 				cb_tell_info(p);
+			});
+		invkr->add_callback(API_CALL::UI_ask_image,
+			[this](const packet &p){
+				cb_ask_info(p);
 			});
 	}catch(const std::runtime_error &e){
 		//send_log(e.what(), API_CALL::LOG_send_error);
@@ -248,6 +273,7 @@ void watchlib::send(const std::string &name, API_CALL code,
 	//4.this metod will iterate through "apps_info" vector and connect
 	//	to each path with desired name;
 	//5.add path-name association to p_send;
+	const packet p = construct_packet(code,std::move(args));
 	if(!p_send->is_conn_by_name(name)){
 		std::cout<<"broadcasting to get info\n";
 		broadcast(API_CALL::ask_info, {});
@@ -264,14 +290,13 @@ void watchlib::send(const std::string &name, API_CALL code,
 				p_send->connect(it->second);
 				p_send->associate(it->second, it->first);
 			}
-			p_send->send_by_path(it->second,
-				construct_packet(code,std::move(args)));
+			p_send->send_by_path(it->second, std::move(p));
 		}catch(const std::runtime_error &e){
 			std::cerr<<"error while sending:"<<e.what()<<"\n";
 		}
 	}else{
 		try{
-			p_send->send_by_name(name, construct_packet(code,std::move(args)));
+			p_send->send_by_name(name, std::move(p));
 		}catch(const std::runtime_error &e){
 			std::cerr<<"error while sending:"<<e.what()<<"\n";
 		}

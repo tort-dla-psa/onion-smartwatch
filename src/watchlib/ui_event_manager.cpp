@@ -1,4 +1,3 @@
-#ifdef UI_BINFORMS
 #include "binform.h"
 #include "event.h" //binforms events
 #include "ui_event_manager.h"
@@ -29,4 +28,3 @@ void ui_event_manager::process_event(const int x, const int y, int ev_id){
 		el->on_tap_e(e);
 	}
 }
-#endif
