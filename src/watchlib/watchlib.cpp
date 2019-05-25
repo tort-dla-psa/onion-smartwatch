@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 #include <fstream>
 #include <stdexcept>
 #include <unistd.h>
@@ -27,7 +28,7 @@ using namespace IO;
 using namespace binforms;
 #endif
 
-watchlib::watchlib(const std::string &name)
+watchlib::watchlib(const std::string name)
 	:name(name)
 {
 	init_status = false;
@@ -93,14 +94,28 @@ void watchlib::cb_ask_info(const packet &p){
 void watchlib::cb_tell_info(const packet &p){
 	//save other app name and tie it with it's path
 	const auto name = p.get_name();
-	const std::string path = watches_path + std::to_string(p.get_pid()) +
+	const auto path = watches_path + std::to_string(p.get_pid()) +
 		"/" + p_lis_name;
-	std::cout<<"app told it's info:"<<name<<"\n";
-	/*const auto it = std::find_if(apps_info.begin(), apps_info.end(),
-		[&](const auto &pair){ return (pair.first == path); });
-	if(it == apps_info.end()){*/
-		apps_info[name] = path;
-//	}
+
+	auto packets_it = delayed_packets.find(name);
+	if(packets_it == delayed_packets.end()){
+		return;
+	}
+	std::cout<<"app found,name:"<<name<<",path:"<<path<<"\n";
+	if(!p_send->is_conn_by_path(path)){
+		p_send->connect(path);
+		p_send->associate(path, name);
+	}
+	auto q = packets_it->second;
+	try{
+		while(!q->empty()){
+			p_send->send_by_name(name, q->front());
+			q->pop();
+		}
+	}catch(const std::runtime_error &e){
+		std::cerr<<"error while sending:"<<e.what()<<"\n";
+	}
+	delayed_packets.erase(packets_it);
 }
 
 void watchlib::init_dir(){
@@ -188,10 +203,10 @@ void watchlib::init_ipc(){
 	try{
 		auto packets_queue = std::make_shared<types::concurrent_queue<packet>>();
 		p_lis = std::make_unique<packet_listener>(p_lis_path, max_cli, proc_sleep,
-				packets_queue);
+			packets_queue);
 		p_send = std::make_unique<packet_sender>();
 		invkr = std::make_unique<callback_invoker>(packets_queue,
-				std::chrono::milliseconds(100));
+			std::chrono::milliseconds(10));
 		p_lis->start();
 	}catch(const std::runtime_error &e){
 		send_log(e.what(), API_CALL::LOG_send_error);
@@ -257,51 +272,37 @@ void watchlib::set_form(std::shared_ptr<binform> appform){
 }
 #endif
 
+//TODO:add sending policy
 void watchlib::send(const int pid, API_CALL code, const std::vector<std::string> &args){
 	const std::string path = watches_path + std::to_string(pid) + "/" + p_lis_name;
+	const auto p = construct_packet(code, std::move(args));
 	if(!p_send->is_conn_by_path(path))
 		p_send->connect(path);
-	p_send->send_by_path(path, {code, app_pid, unix_pid, name, std::move(args)});
+	p_send->send_by_path(path, p);
 }
 
 void watchlib::send(const std::string &name, API_CALL code,
 	const std::vector<std::string> &args)
 {
-	//1.ask every app for info;
-	//2.packet_listener will get answer and call cb_tell_info
-	//3.cb_tell_info will add path and name to "apps_info" vector;
-	//4.this metod will iterate through "apps_info" vector and connect
-	//	to each path with desired name;
-	//5.add path-name association to p_send;
 	const packet p = construct_packet(code,std::move(args));
 	if(!p_send->is_conn_by_name(name)){
 		std::cout<<"broadcasting to get info\n";
 		broadcast(API_CALL::ask_info, {});
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));//wait for apps
-		auto it = apps_info.find(name);
-		if(it == apps_info.end()){
-			//app with this name wasn't found
-			apps_info.clear();
-			return;
-		}
-		std::cout<<"app found:"<<it->second<<"\n";
-		try{
-			if(!p_send->is_conn_by_path(it->second)){
-				p_send->connect(it->second);
-				p_send->associate(it->second, it->first);
-			}
-			p_send->send_by_path(it->second, std::move(p));
-		}catch(const std::runtime_error &e){
-			std::cerr<<"error while sending:"<<e.what()<<"\n";
+		auto packets_it = delayed_packets.find(name);
+		if(packets_it == delayed_packets.end()){
+			auto q = std::make_shared<std::queue<packet>>();
+			delayed_packets[name] = q;
+			q->emplace(p);
+		}else{
+			packets_it->second->emplace(p);
 		}
 	}else{
 		try{
-			p_send->send_by_name(name, std::move(p));
+			p_send->send_by_name(name, p);
 		}catch(const std::runtime_error &e){
 			std::cerr<<"error while sending:"<<e.what()<<"\n";
 		}
 	}
-	apps_info.clear();
 }
 
 void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){

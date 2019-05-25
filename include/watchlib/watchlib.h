@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include "API_CALLS.h"
 #include "packet_listener.h"
 #include "packet_sender.h"
@@ -36,10 +37,10 @@ protected:
 #endif
 	void cb_ask_info(const packet &p);
 	void cb_tell_info(const packet &p);
-	std::map<std::string, std::string> apps_info;//[name] = path
 	packet construct_packet(API_CALL code, const std::vector<std::string> &args);
+	std::map<std::string, std::shared_ptr<std::queue<packet>>> delayed_packets;
 public:
-	watchlib(const std::string &name);
+	watchlib(const std::string name);
 	~watchlib();
 
 	void init();
