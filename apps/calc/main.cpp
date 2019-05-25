@@ -15,12 +15,15 @@ using namespace binforms;
 using namespace watches;
 
 class myform:public binform{
+protected:
 	std::string first, second;
 	bool enter_second;
 	sptr<label> lbl;
-	sptr<std::function<void(void)>> f;
+	std::function<void(void)> f;
 	void update_label(){
-	//	lbl->
+		lbl->set_text(first);
+		lbl->update();
+		update();
 	}
 	std::shared_ptr<button> mk_btn(std::vector<std::shared_ptr<button>> &vec,
 		const std::string &lbl)
@@ -103,11 +106,9 @@ public:
 
 		l->add_element(lbl);
 		for(auto &b:buttons){
-			b->bind([this, &b](){
-				enter_digit((b->get_label())->get_text()[0]);
-			});
-		}
-		for(auto &b:actions){
+			auto f = std::bind(&myform::enter_digit, this,
+				(b->get_label())->get_text()[0]);
+			b->bind(f);
 		}
 		l->add_element(st_h);
 		st_h->move(0, lbl->get_h() + 1);
@@ -122,55 +123,58 @@ public:
 	}
 	void enter_digit(char digit){
 		if(f){
-			second+=digit;
+			second += digit;
 		}else{
-			first+=digit;
+			first += digit;
 		}
+		update_label();
 	}
 	void add(){
 		eq();
-		f = std::make_shared<std::function<void()>>([this](){
+		f = [this](){
 			double real_first = std::stod(first);
 			double real_second = std::stod(second);
 			real_first+=real_second;
 			first = std::to_string(real_first);
 			second = "0";
-		});
+		};
 	}
 	void sub(){
 		eq();
-		f = std::make_shared<std::function<void()>>([this](){
+		f = [this](){
 			double real_first = std::stod(first);
 			double real_second = std::stod(second);
 			real_first-=real_second;
 			first = std::to_string(real_first);
 			second = "0";
-		});
+		};
 	}
 	void mul(){
 		eq();
-		f = std::make_shared<std::function<void()>>([this](){
+		f = [this](){
 			double real_first = std::stod(first);
 			double real_second = std::stod(second);
 			real_first*=real_second;
 			first = std::to_string(real_first);
 			second = "0";
-		});
+		};
 	}
 	void div(){
 		eq();
-		f = std::make_shared<std::function<void()>>([this](){
+		f = [this](){
 			double real_first = std::stod(first);
 			double real_second = std::stod(second);
 			real_first/=real_second;
 			first = std::to_string(real_first);
 			second = "0";
-		});
+		};
 	}
 	void eq(){
 		if(f){
-			(*f)();
+			return;
 		}
+		f();
+		update_label();
 	}
 };
 
