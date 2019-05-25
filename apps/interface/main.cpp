@@ -33,7 +33,7 @@ void throw_ex(const std::string &mes){
 	throw std::runtime_error(fullmes);
 }
 
-inline void draw_img(image* img){
+inline void draw_img(std::shared_ptr<image> img){
 	const uint w = img->get_w();
 	const uint h = img->get_h();
 
@@ -114,6 +114,7 @@ public:
 
 
 class myform:public binform{
+protected:
 	std::vector<event> events;
 
 	std::vector<sptr<event>> events_vec;
@@ -140,7 +141,7 @@ class myform:public binform{
 					draw_layer(l);
 				}
 			}else{
-				lib_obj->send(app_name, API_CALL::UI_ask_image, {});
+				lib_obj->send(app_name, API_CALL::UI_ask_image);
 				if(app_img){
 					d.draw_image(0, 0, app_img, img);
 				}
@@ -148,7 +149,7 @@ class myform:public binform{
 				draw_layer(cursor_layer);
 			}
 			events_mutex.unlock();
-			draw_img(this->img.get());
+			draw_img(img);
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		}
 	}
@@ -159,6 +160,10 @@ class myform:public binform{
 	std::atomic_bool app_launched;
 	std::string app_name;
 public:
+	void set_app_name(std::string name){
+		app_name = name;
+	}
+
 	myform(std::shared_ptr<watchlib> lib_obj, const uint w, const uint h)
 		:binform(w,h)
 	{
@@ -173,19 +178,22 @@ public:
 		add_layer(cursor_layer);
 
 		auto ui_layer0 = std::make_shared<layer>(w,h);
+		auto btn = std::make_shared<button>("calc");
+		btn->move(0,0);
+		lib_obj->set_policy("calc", send_policy::repeatedly);
+		btn->bind([&](){
+			events_mutex.lock();
+			set_app_name("calc");
+			//launch(watches_path+"/bin/"+app_name+"/"+app_name);
+			app_launched = true;
+			events_mutex.unlock();
+		});
+		ui_layer0->add_element(btn);
+
 		auto clk = std::make_shared<form_clock>(app_h, app_h);
 		clk->move(0, 0);
 		ui_layer0->add_element(clk);
 
-		auto btn = std::make_shared<button>("calc");
-		btn->move(w-btn->get_w()-1, 0);
-		btn->bind([this](){
-			app_name = "calc";
-			launch(watches_path+"/bin/"+app_name+"/"+app_name);
-			app_launched = true;
-		});
-		
-		ui_layer0->add_element(btn);
 		add_layer(ui_layer0);
 
 		drv.init();
@@ -199,8 +207,8 @@ public:
 	}
 	void draw(){
 		//TODO: fix this monstrosity
-		draw_img(this->img.get());
-		const auto byte_img = binfont::to_byte_img(this->img);
+		draw_img(img);
+		const auto byte_img = binfont::to_byte_img(img);
 		const auto bytes = byte_img->get_pixels();
 		drv.draw((uint8_t*)&bytes[0], bytes.size());
 	}
@@ -219,8 +227,7 @@ public:
 
 		if(app_launched){
 			lib_obj->send(app_name, API_CALL::UI_cursor_pressed,
-				{std::to_string(cursor_x), 
-				std::to_string(cursor_y)});
+				{cursor_x, cursor_y, int(BINFORM_EVENTS::press)});
 		}else{
 			auto el = get_element(cursor_x, cursor_y);
 			if(!el){
@@ -282,6 +289,10 @@ void cb_key_press(const packet &p){
 	}
 }
 
+void cb_send_image(const packet &p){
+	form->set_app_img(std::move(p));
+}
+
 int main(){
 	lib_obj = std::make_shared<watchlib>("interface");
 
@@ -292,7 +303,6 @@ int main(){
 	//lib_obj->set_form(form);
 	lib_obj->send_log("init succseed", API_CALL::LOG_send_info);
 	lib_obj->add_callback(API_CALL::UI_key_pressed, cb_key_press);
-	lib_obj->add_callback(API_CALL::UI_send_image, 
-		std::bind(&myform::set_app_img, form, std::placeholders::_1));
+	lib_obj->add_callback(API_CALL::UI_send_image, cb_send_image);
 	lib_obj->start();
 }
