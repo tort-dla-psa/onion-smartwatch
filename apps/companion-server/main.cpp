@@ -15,6 +15,7 @@ const std::string exit_cmd = "q";
 std::shared_ptr<watchlib> lib_ptr;
 
 void lib_func(){
+	lib_ptr = std::make_shared<watchlib>("companion_server");
 	lib_ptr->init();
 	lib_ptr->start();
 }
@@ -22,22 +23,22 @@ void lib_func(){
 int main(){
 	//weird bug when passing "..." or pre-defined string
 	//lib_ptr = std::make_shared<watchlib>(std::string("companion_server"));
-	std::shared_ptr<watchlib> lib_ptr(new watchlib("companion_server"));
-	::lib_ptr = lib_ptr;
 
 	std::thread lib_thread(lib_func);
+
 	socket_op s_op;
 	auto sock = s_op.create(AF_INET, SOCK_STREAM, 0);
 	s_op.bind(sock, 1337);
 	s_op.listen(sock);
-	sptr<IO::socket> cli = s_op.accept(sock);
+	auto cli = s_op.accept(sock);
+
 	while(true){
 		std::string data;
 		data_protocol::recv(s_op, cli, data);
 		std::cout<<"i got:"<<data<<'\n';
 		try{
 			lib_ptr->send("interface", API_CALL::UI_key_pressed, { data });
-			lib_ptr->send_log("key recieved:"+data, API_CALL::LOG_send_info);
+			//lib_ptr->send_log("key recieved:"+data, API_CALL::LOG_send_info);
 		}catch(const std::runtime_error &e){
 			std::cerr<<"error occured:"<<e.what()<<'\n';
 		}
