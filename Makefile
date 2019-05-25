@@ -40,7 +40,7 @@ app_ui_dep := $(libwatches_trg) $(i2c)
 
 #companion-server
 companion_serv := companion-server
-companion_serv_flags := -Llib -lbinforms -lonionwatch -lunixiocpp -lpthread
+companion_serv_flags := -Llib -lbinforms -lonionwatch -lunixiocpp -lpthread -DUI_BINFORMS
 # TODO:separete UI and non-UI libonionwatch
 companion_serv_s := $(appsdir)/$(companion_serv)/*.cpp
 companion_serv_h := $(appsdir)/$(companion_serv)
