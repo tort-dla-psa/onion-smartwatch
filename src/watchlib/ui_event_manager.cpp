@@ -5,7 +5,7 @@
 using namespace watches;
 using namespace binforms;
 
-ui_event_manager::ui_event_manager(sptr<binform> form){
+ui_event_manager::ui_event_manager(std::shared_ptr<binform> form){
 	this->form = form;
 }
 

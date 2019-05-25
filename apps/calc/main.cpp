@@ -9,8 +9,6 @@
 #include "stack.h"
 
 const int w = 100, h = 64;
-template<typename T>
-using sptr = std::shared_ptr<T>;
 using namespace binforms;
 using namespace watches;
 
@@ -18,7 +16,7 @@ class myform:public binform{
 protected:
 	std::string first, second;
 	bool enter_second;
-	sptr<label> lbl;
+	std::shared_ptr<label> lbl;
 	std::function<void(void)> f;
 	void update_label(){
 		lbl->set_text(first);
@@ -36,8 +34,8 @@ public:
 		first = "0";
 		second = "0";
 		enter_second = false;
-		sptr<layer> l(new layer(w,h));
-		std::vector<sptr<button>> buttons, actions;
+		auto l = std::make_shared<container>(w,h);
+		std::vector<std::shared_ptr<button>> buttons, actions;
 		buttons.reserve(15);
 
 		lbl = std::make_shared<label>(first);
@@ -62,46 +60,34 @@ public:
 		b9->move(0, lbl->get_h());
 		auto st_v = std::make_shared<v_stack>();
 		auto st_h = std::make_shared<h_stack>();
-		st_h->add_element(b9);
-		st_h->add_element(b8);
-		st_h->add_element(b7);
+		st_h->set_elements({b9, b8, b7});
 		st_h->update();
 		st_v->add_element(std::move(st_h));
 		st_v->update();
 
 		st_h = std::make_shared<h_stack>();
-		st_h->add_element(b6);
-		st_h->add_element(b5);
-		st_h->add_element(b4);
+		st_h->set_elements({b6, b5, b4});
 		st_h->update();
 		st_v->add_element(std::move(st_h));
 		st_v->update();
 
 		st_h = std::make_shared<h_stack>();
-		st_h->add_element(b3);
-		st_h->add_element(b2);
-		st_h->add_element(b1);
+		st_h->set_elements({b3, b2, b1});
 		st_h->update();
 		st_v->add_element(std::move(st_h));
 		st_v->update();
 
 		st_h = std::make_shared<h_stack>();
-		st_h->add_element(b0);
-		st_h->add_element(b_dot);
-		st_h->add_element(b_eq);
+		st_h->set_elements({b0, b_dot, b_eq});
 		st_h->update();
 		st_v->add_element(std::move(st_h));
 		st_v->update();
 
 		st_h = std::make_shared<h_stack>();
 		auto st_funcs = std::make_shared<v_stack>();
-		st_funcs->add_element(b_plus);
-		st_funcs->add_element(b_minus);
-		st_funcs->add_element(b_mul);
-		st_funcs->add_element(b_div);
+		st_funcs->set_elements({b_plus,b_minus,b_mul,b_div});
 		st_funcs->update();
-		st_h->add_element(st_v);
-		st_h->add_element(st_funcs);
+		st_h->set_elements({st_v, st_funcs});
 		st_h->update();
 
 		l->add_element(lbl);
@@ -178,7 +164,7 @@ public:
 	}
 };
 
-inline void draw_img(sptr<element> el){
+inline void draw_img(std::shared_ptr<element> el){
 	const auto img = el->get_image();
 	const uint w = img->get_w();
 	const uint h = img->get_h();

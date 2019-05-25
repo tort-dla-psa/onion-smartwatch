@@ -124,7 +124,7 @@ protected:
 	drawer d;
 	sptr<cursor> c;
 	std::thread loop_thr;
-	void draw_layer(const std::shared_ptr<layer> &l){
+	void draw_layer(const std::shared_ptr<container> &l){
 		const auto elements = l->get_elements();
 		for(const auto &el:elements){
 			d.draw_image(el->get_x(), el->get_y(),
@@ -136,7 +136,7 @@ protected:
 		while(!end_requested){
 			events_mutex.lock();
 			if(!app_launched){
-				for(auto &l:reverse_wrapper(layers)){
+				for(auto &l:layers){
 					l->update();
 					draw_layer(l);
 				}
@@ -155,7 +155,7 @@ protected:
 	}
 	std::shared_ptr<binforms::bit_image> app_img;
 	std::shared_ptr<watchlib> lib_obj;
-	std::shared_ptr<layer> cursor_layer;
+	std::shared_ptr<container> cursor_layer;
 //TODO:incapsulate
 	std::atomic_bool app_launched;
 	std::string app_name;
@@ -173,11 +173,17 @@ public:
 		this->lib_obj = lib_obj;
 		c = std::make_shared<cursor>(0,0,5,5);
 
-		cursor_layer = std::make_shared<layer>(w, h);
+		cursor_layer = std::make_shared<container>(w, h);
 		cursor_layer->add_element(c);
 		add_layer(cursor_layer);
 
-		auto ui_layer0 = std::make_shared<layer>(w,h);
+		auto ui_layer0 = std::make_shared<container>(w,h);
+		auto clk = std::make_shared<form_clock>(app_h, app_h);
+		clk->move(0, 0);
+		ui_layer0->add_element(clk);
+		add_layer(std::move(ui_layer0));
+
+		ui_layer0 = std::make_shared<container>(w,h);
 		auto btn = std::make_shared<button>("calc");
 		btn->move(0,0);
 		lib_obj->set_policy("calc", send_policy::repeatedly);
@@ -189,11 +195,6 @@ public:
 			events_mutex.unlock();
 		});
 		ui_layer0->add_element(btn);
-
-		auto clk = std::make_shared<form_clock>(app_h, app_h);
-		clk->move(0, 0);
-		ui_layer0->add_element(clk);
-
 		add_layer(ui_layer0);
 
 		drv.init();
