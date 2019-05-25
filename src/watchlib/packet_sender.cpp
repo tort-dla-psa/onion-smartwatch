@@ -37,14 +37,20 @@ void packet_sender::connect(const std::string &path){
 	}
 }
 void packet_sender::send_by_path(const std::string &path, const packet &p){
+#ifdef DEBUG
+	std::cout<<"PS:...sending to:"<<path<<",call:"<<p.get_pid()<<",args:\n";
+	for(const auto &arg:p.get_args()){
+		std::cout<<"PS:arg:"<<arg<<"\n";
+	}
+#endif
 	const auto it = std::find_if(listeners.begin(), listeners.end(), 
 		[&](const auto &sock){ return sock->get_path() == path; });
 	if(it == listeners.end()){ //socket is not connected
 		throw_ex("isn't connected to: "+path);
 	}else{
-		const sptr<IO::socket> sock = *it;
+		const auto sock = *it;
 		try{
-			const std::string data = p.serialize();
+			const auto data = p.serialize();
 			data_protocol::send(s_op, sock, data);
 		}catch(std::runtime_error e){
 			throw_ex(std::string("can't send to ")+path+
@@ -54,6 +60,7 @@ void packet_sender::send_by_path(const std::string &path, const packet &p){
 	}
 }
 void packet_sender::send_by_name(const std::string &name, const packet &p){
+	std::cout<<"PS:sending to:"<<name<<"...\n";
 	auto it = name_path_pair.find(name);
 	if(it == name_path_pair.end()){ //socket is not connected
 		throw_ex("no path is associated with:"+name);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <queue>
 #include <string>
 #include "API_CALLS.h"
 #include "packet_listener.h"
@@ -44,8 +45,8 @@ protected:
 	void cb_ask_info(const packet &p);
 	void cb_tell_info(const packet &p);
 	packet construct_packet(API_CALL code, const std::vector<std::string> &args);
-	std::map<std::string, std::shared_ptr<std::queue<packet>>> delayed_packets;
-	std::map<std::string, send_policy> policies;
+	std::map<std::string, std::queue<packet>> delayed_packets;
+	//std::map<std::string, send_policy> policies;
 	std::map<std::string, int> statistics;
 public:
 	watchlib(const std::string name);
@@ -64,11 +65,15 @@ public:
 		invkr->add_callback(code, cb);
 	}
 
-	void set_policy(const std::string &name, send_policy policy);
+	void set_policy(const std::string name, send_policy policy);
 	send_policy get_policy(const std::string &name);
+	void send(const int pid, API_CALL code);
 	void send(const int pid, API_CALL code, const std::vector<std::string> &args);
+	void send(const int pid, API_CALL code, const std::vector<int> &args);
+	void send(const std::string &name, API_CALL code);
 	void send(const std::string &name, API_CALL code,
 		const std::vector<std::string> &args);
+	void send(const std::string &name, API_CALL code, const std::vector<int> &args);
 	void send_log(const std::string &mes, API_CALL LOG_api_call);
 	void broadcast(API_CALL code, const std::vector<std::string> &args);
 	void start();

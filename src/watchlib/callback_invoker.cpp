@@ -21,7 +21,14 @@ void callback_invoker::start_processing(){
 				continue;
 			}
 		}
-		std::map<API_CALL, cb>::iterator it = mp.find(p.get_val());
+#ifdef DEBUG
+		std::cout<<"CI:got packet from:"<<p.get_name()
+			<<",call:"<<p.get_pid()<<",args:\n";
+		for(const auto &arg:p.get_args()){
+			std::cout<<"CI:arg:"<<arg<<"\n";
+		}
+#endif
+		auto it = mp.find(p.get_val());
 		if(it != mp.end()){
 			try{
 				(it->second)(p);

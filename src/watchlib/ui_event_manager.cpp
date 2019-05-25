@@ -15,7 +15,7 @@ void ui_event_manager::process_event(const int x, const int y, int ev_id){
 	}
 	auto el = form->get_element(x,y);
 	const auto ev = static_cast<BINFORM_EVENTS>(ev_id);
-	const std::shared_ptr<event> e(new event(x,y));
+	const auto e = std::make_shared<event>(x,y);
 	if(ev == BINFORM_EVENTS::focus_enter){
 		el->on_focus_enter_e(e);
 	}else if(ev == BINFORM_EVENTS::focus_leave){

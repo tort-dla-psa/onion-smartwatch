@@ -134,9 +134,9 @@ void packet_listener::process_func(){
 		mt.lock();
 		auto it = clients.begin();
 		while(it != clients.end()){
-			sptr<packet_listener_client> cli = (*it);
+			auto cli = (*it);
 			if(cli->got_packets()){
-				std::vector<packet> packets = cli->get_queue();
+				auto packets = cli->get_queue();
 				queue.reserve(queue.size() + packets.size());
 				std::move(packets.begin(), packets.end(),
 					std::back_inserter(queue));

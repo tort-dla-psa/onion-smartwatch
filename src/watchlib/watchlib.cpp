@@ -71,8 +71,15 @@ void watchlib::cb_UI_cursor_press(const packet &p){
 }
 void watchlib::cb_UI_ask_image(const packet &p){
 	if(form){
+		const auto path = watches_path + std::to_string(p.get_pid())
+			+ "/" + p_lis_name;
 		const auto img_data = form->get_image()->serialize();
-		send(p.get_name(), API_CALL::UI_send_image, {std::move(img_data)});
+		//send(p.get_name(), API_CALL::UI_send_image, {std::move(img_data)});
+		if(!p_send->is_conn_by_path(path)){
+			p_send->connect(path);
+		}
+		auto p = construct_packet(API_CALL::UI_send_image, {img_data});
+		p_send->send_by_path(path, p);
 	}
 }
 #endif
@@ -99,6 +106,7 @@ void watchlib::cb_tell_info(const packet &p){
 
 	auto packets_it = delayed_packets.find(name);
 	if(packets_it == delayed_packets.end()){
+		std::cout<<"unwanted app info:"<<p.get_name()<<"\n";
 		return;
 	}
 	std::cout<<"app found,name:"<<name<<",path:"<<path<<"\n";
@@ -108,9 +116,10 @@ void watchlib::cb_tell_info(const packet &p){
 	}
 	auto q = packets_it->second;
 	try{
-		while(!q->empty()){
-			p_send->send_by_name(name, q->front());
-			q->pop();
+		while(!q.empty()){
+			const auto p = q.front();
+			p_send->send_by_name(name, p);
+			q.pop();
 		}
 	}catch(const std::runtime_error &e){
 		std::cerr<<"error while sending:"<<e.what()<<"\n";
@@ -228,7 +237,11 @@ void watchlib::init(){
 			});
 		invkr->add_callback(API_CALL::UI_ask_image,
 			[this](const packet &p){
-				cb_ask_info(p);
+				cb_UI_ask_image(p);
+			});
+		invkr->add_callback(API_CALL::UI_cursor_pressed,
+			[this](const packet &p){
+				cb_UI_cursor_press(p);
 			});
 	}catch(const std::runtime_error &e){
 		//send_log(e.what(), API_CALL::LOG_send_error);
@@ -269,27 +282,49 @@ void watchlib::end(){
 #ifdef UI_BINFORMS
 void watchlib::set_form(std::shared_ptr<binform> appform){
 	ui_ev_man = std::make_unique<ui_event_manager>(appform);
+	form = appform;
 }
 #endif
 
-void watchlib::set_policy(const std::string &name, send_policy policy){
-	policies[name] = policy;
+void watchlib::set_policy(const std::string name, send_policy policy){
+	//policies[name] = policy;
 }
 
 send_policy watchlib::get_policy(const std::string &name){
-	auto it = policies.find(name);
+	/*auto it = policies.find(name);
 	if(it == policies.end()){
 		return send_policy::default_pol;
 	}
-	return it->second;
+	return it->second;*/
+	return send_policy::repeatedly;
+}
+
+void watchlib::send(const int pid, API_CALL code){
+	std::vector<std::string> new_args;
+	send(name, code, std::move(new_args));
 }
 
 void watchlib::send(const int pid, API_CALL code, const std::vector<std::string> &args){
-	const std::string path = watches_path + std::to_string(pid) + "/" + p_lis_name;
+	const auto path = watches_path + std::to_string(pid) + "/" + p_lis_name;
 	const auto p = construct_packet(code, std::move(args));
-	if(!p_send->is_conn_by_path(path))
+	if(!p_send->is_conn_by_path(path)){
 		p_send->connect(path);
+	}
 	p_send->send_by_path(path, p);
+}
+
+void watchlib::send(const int pid, API_CALL code, const std::vector<int> &args){
+	std::vector<std::string> new_args;
+	new_args.reserve(args.size());
+	for(int i = 0; i < args.size(); i++){
+		new_args.emplace_back(std::to_string(args[i]));
+	}
+	send(pid, code, std::move(new_args));
+}
+
+void watchlib::send(const std::string &name, API_CALL code){
+	std::vector<std::string> new_args;
+	send(name, code, std::move(new_args));
 }
 
 void watchlib::send(const std::string &name, API_CALL code,
@@ -297,6 +332,7 @@ void watchlib::send(const std::string &name, API_CALL code,
 {
 	const packet p = construct_packet(code,std::move(args));
 	if(!p_send->is_conn_by_name(name)){
+		/*
 		auto it = statistics.find(name);
 		if(it == statistics.end()){
 			statistics[name] = 0;
@@ -309,18 +345,16 @@ void watchlib::send(const std::string &name, API_CALL code,
 				}
 				return;
 			}
-		}
+		}*/
 		std::cout<<"broadcasting to get info\n";
 		broadcast(API_CALL::ask_info, {});
 		auto packets_it = delayed_packets.find(name);
 		if(packets_it == delayed_packets.end()){
-			auto q = std::make_shared<std::queue<packet>>();
-			delayed_packets[name] = q;
-			q->emplace(p);
+			(delayed_packets[name]).emplace(p);
 		}else{
-			packets_it->second->emplace(p);
+			packets_it->second.emplace(p);
 		}
-		statistics[name]++;
+		//statistics[name]++;
 	}else{
 		try{
 			p_send->send_by_name(name, p);
@@ -328,6 +362,15 @@ void watchlib::send(const std::string &name, API_CALL code,
 			std::cerr<<"error while sending:"<<e.what()<<"\n";
 		}
 	}
+}
+
+void watchlib::send(const std::string &name, API_CALL code, const std::vector<int> &args){
+	std::vector<std::string> new_args;
+	new_args.reserve(args.size());
+	for(int i = 0; i < args.size(); i++){
+		new_args.emplace_back(std::to_string(args[i]));
+	}
+	send(name, code, std::move(new_args));
 }
 
 void watchlib::broadcast(API_CALL code, const std::vector<std::string> &args){
