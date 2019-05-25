@@ -272,7 +272,18 @@ void watchlib::set_form(std::shared_ptr<binform> appform){
 }
 #endif
 
-//TODO:add sending policy
+void watchlib::set_policy(const std::string &name, send_policy policy){
+	policies[name] = policy;
+}
+
+send_policy watchlib::get_policy(const std::string &name){
+	auto it = policies.find(name);
+	if(it == policies.end()){
+		return send_policy::default_pol;
+	}
+	return it->second;
+}
+
 void watchlib::send(const int pid, API_CALL code, const std::vector<std::string> &args){
 	const std::string path = watches_path + std::to_string(pid) + "/" + p_lis_name;
 	const auto p = construct_packet(code, std::move(args));
@@ -286,6 +297,19 @@ void watchlib::send(const std::string &name, API_CALL code,
 {
 	const packet p = construct_packet(code,std::move(args));
 	if(!p_send->is_conn_by_name(name)){
+		auto it = statistics.find(name);
+		if(it == statistics.end()){
+			statistics[name] = 0;
+		}else{
+			auto pol = get_policy(name);
+			if(pol == send_policy::once && it->second > 0){
+				auto packets_it = delayed_packets.find(name);
+				if(packets_it != delayed_packets.end()){
+					delayed_packets.erase(packets_it);
+				}
+				return;
+			}
+		}
 		std::cout<<"broadcasting to get info\n";
 		broadcast(API_CALL::ask_info, {});
 		auto packets_it = delayed_packets.find(name);
@@ -296,6 +320,7 @@ void watchlib::send(const std::string &name, API_CALL code,
 		}else{
 			packets_it->second->emplace(p);
 		}
+		statistics[name]++;
 	}else{
 		try{
 			p_send->send_by_name(name, p);
