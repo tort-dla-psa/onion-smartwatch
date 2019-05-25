@@ -8,7 +8,7 @@
 #include "image.h"
 #include "stack.h"
 
-const int w = 128, h = 64;
+const int w = 100, h = 64;
 template<typename T>
 using sptr = std::shared_ptr<T>;
 using namespace binforms;
@@ -188,7 +188,7 @@ inline void draw_img(sptr<element> el){
 }
 
 int main(){
-	sptr<myform> f(new myform());
+	auto f = std::make_shared<myform>();
 	f->update();
 	draw_img(f);
 	watchlib lib("calc");
