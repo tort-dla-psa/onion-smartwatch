@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <iostream>
 #include <memory>
+#include <string>
 #include "data_protocol.h"
 #include "API_CALLS.h"
 #include "watchlib.h"
@@ -11,7 +12,7 @@ using namespace watches;
 using namespace IO;
 
 const std::string exit_cmd = "q";
-std::shared_ptr<watchlib> lib_ptr = nullptr;
+std::shared_ptr<watchlib> lib_ptr;
 
 void lib_func(){
 	lib_ptr->init();
@@ -19,10 +20,14 @@ void lib_func(){
 }
 
 int main(){
-	lib_ptr = std::make_shared<watchlib>("companion_server");
+	//weird bug when passing "..." or pre-defined string
+	//lib_ptr = std::make_shared<watchlib>(std::string("companion_server"));
+	std::shared_ptr<watchlib> lib_ptr(new watchlib("companion_server"));
+	::lib_ptr = lib_ptr;
+
 	std::thread lib_thread(lib_func);
 	socket_op s_op;
-	sptr<IO::socket> sock = s_op.create(AF_INET, SOCK_STREAM, 0);
+	auto sock = s_op.create(AF_INET, SOCK_STREAM, 0);
 	s_op.bind(sock, 1337);
 	s_op.listen(sock);
 	sptr<IO::socket> cli = s_op.accept(sock);
