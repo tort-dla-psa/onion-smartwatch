@@ -173,10 +173,6 @@ public:
 		this->lib_obj = lib_obj;
 		c = std::make_shared<cursor>(0,0,5,5);
 
-		cursor_layer = std::make_shared<container>(w, h);
-		cursor_layer->add_element(c);
-		add_layer(cursor_layer);
-
 		auto ui_layer0 = std::make_shared<container>(w,h);
 		auto clk = std::make_shared<form_clock>(app_h, app_h);
 		clk->move(0, 0);
@@ -196,6 +192,10 @@ public:
 		});
 		ui_layer0->add_element(btn);
 		add_layer(ui_layer0);
+
+		cursor_layer = std::make_shared<container>(w, h);
+		cursor_layer->add_element(c);
+		add_layer(cursor_layer);
 
 		drv.init();
 	}
