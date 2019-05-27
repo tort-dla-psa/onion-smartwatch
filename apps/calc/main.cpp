@@ -15,80 +15,91 @@ using namespace watches;
 class myform:public binform{
 protected:
 	std::string first, second;
-	bool enter_second;
+	std::string* current;
 	std::shared_ptr<label> lbl;
-	std::function<void(void)> f;
-	void update_label(){
-		lbl->set_text(first);
+	std::function<void(double &a, double b)> f;
+
+	void update_label(const std::string &text){
+		lbl->set_text(text);
 		lbl->update();
 		update();
 	}
+
 	std::shared_ptr<button> mk_btn(std::vector<std::shared_ptr<button>> &vec,
 		const std::string &lbl)
 	{
 		return vec.emplace_back(new button(lbl));
+	}
+
+	void do_math(){
+		if(!f){
+			return;
+		}
+		if(current == &first){
+			current = &second;
+			update_label(second);
+			return;
+		}
+		double real_first = std::stod(first);
+		double real_second = std::stod(second);
+		f(real_first, real_second);
+		first = std::to_string(real_first);
+		update_label(first);
+		second = "0";
 	}
 public:
 	myform():binform(w,h){
 		f = nullptr;
 		first = "0";
 		second = "0";
-		enter_second = false;
+		current = &first;
 		auto l = std::make_shared<container>(w,h);
 		std::vector<std::shared_ptr<button>> buttons, actions;
 		buttons.reserve(15);
 
 		lbl = std::make_shared<label>(first);
-		auto b9 = mk_btn(buttons,("9"));
-		auto b8 = mk_btn(buttons,"8");
-		auto b7 = mk_btn(buttons,"7");
-		auto b6 = mk_btn(buttons,"6");
-		auto b5 = mk_btn(buttons,"5");
-		auto b4 = mk_btn(buttons,"4");
-		auto b3 = mk_btn(buttons,"3");
-		auto b2 = mk_btn(buttons,"2");
-		auto b1 = mk_btn(buttons,"1");
-		auto b0 = mk_btn(buttons,"0");
-		auto b_dot = mk_btn(buttons,".");
-		auto b_plus = mk_btn(actions,"+");
-		auto b_minus = mk_btn(actions,"-");
-		auto b_mul = mk_btn(actions,"*");
-		auto b_div = mk_btn(actions,"/");
-		auto b_eq = mk_btn(actions,"=");
+		auto b9 = mk_btn(buttons, "9");
+		auto b8 = mk_btn(buttons, "8");
+		auto b7 = mk_btn(buttons, "7");
+		auto b6 = mk_btn(buttons, "6");
+		auto b5 = mk_btn(buttons, "5");
+		auto b4 = mk_btn(buttons, "4");
+		auto b3 = mk_btn(buttons, "3");
+		auto b2 = mk_btn(buttons, "2");
+		auto b1 = mk_btn(buttons, "1");
+		auto b0 = mk_btn(buttons, "0");
+		auto b_dot = 	mk_btn(buttons, ".");
+		auto b_plus = 	mk_btn(actions, "+");
+		auto b_minus = 	mk_btn(actions, "-");
+		auto b_mul = 	mk_btn(actions, "*");
+		auto b_div = 	mk_btn(actions, "/");
+		auto b_eq = 	mk_btn(actions, "=");
 
 		lbl->move(0,0);
-		b9->move(0, lbl->get_h());
-		auto st_v = std::make_shared<v_stack>();
-		auto st_h = std::make_shared<h_stack>();
-		st_h->set_elements({b9, b8, b7});
-		st_h->update();
-		st_v->add_element(std::move(st_h));
-		st_v->update();
+		auto buttons_cols = std::make_shared<h_stack>();
+		auto buttons_rows = std::make_shared<v_stack>();
+		buttons_cols->set_elements({b9, b8, b7});
+		buttons_rows->add_element(std::move(buttons_cols));
 
-		st_h = std::make_shared<h_stack>();
-		st_h->set_elements({b6, b5, b4});
-		st_h->update();
-		st_v->add_element(std::move(st_h));
-		st_v->update();
+		buttons_cols = std::make_shared<h_stack>();
+		buttons_cols->set_elements({b6, b5, b4});
+		buttons_rows->add_element(std::move(buttons_cols));
 
-		st_h = std::make_shared<h_stack>();
-		st_h->set_elements({b3, b2, b1});
-		st_h->update();
-		st_v->add_element(std::move(st_h));
-		st_v->update();
+		buttons_cols = std::make_shared<h_stack>();
+		buttons_cols->set_elements({b3, b2, b1});
+		buttons_rows->add_element(std::move(buttons_cols));
 
-		st_h = std::make_shared<h_stack>();
-		st_h->set_elements({b0, b_dot, b_eq});
-		st_h->update();
-		st_v->add_element(std::move(st_h));
-		st_v->update();
+		buttons_cols = std::make_shared<h_stack>();
+		buttons_cols->set_elements({b0, b_dot, b_eq});
+		buttons_rows->add_element(std::move(buttons_cols));
 
-		st_h = std::make_shared<h_stack>();
+		auto main_st = std::make_shared<h_stack>();
 		auto st_funcs = std::make_shared<v_stack>();
 		st_funcs->set_elements({b_plus,b_minus,b_mul,b_div});
-		st_funcs->update();
-		st_h->set_elements({st_v, st_funcs});
-		st_h->update();
+		main_st->set_elements({std::move(buttons_rows), std::move(st_funcs)});
+		main_st->move(0, lbl->get_h() + 1);
+		main_st->update();
+		l->add_element(std::move(main_st));
 
 		l->add_element(lbl);
 		for(auto &b:buttons){
@@ -96,72 +107,49 @@ public:
 				(b->get_label())->get_text()[0]);
 			b->bind(f);
 		}
-		l->add_element(st_h);
-		st_h->move(0, lbl->get_h() + 1);
 
-		b_plus->bind(std::bind(&myform::add, this));
-		b_minus->bind(std::bind(&myform::sub, this));
-		b_mul->bind(std::bind(&myform::mul, this));
-		b_div->bind(std::bind(&myform::div, this));
-		b_div->bind(std::bind(&myform::eq, this));
+		b_plus->bind([this](){
+			f = [](double &a, double b){ a += b; };
+			do_math();
+		});
+		b_minus->bind([this](){
+			f = [](double &a, double b){ a -= b; };
+			do_math();
+		});
+		b_mul->bind([this](){
+			f = [](double &a, double b){ a *= b; };
+			do_math();
+		});
+		b_div->bind([this](){
+			f = [](double &a, double b){ a /= b; };
+			do_math();
+		});
+		b_eq->bind([this](){
+			do_math();
+		});
+
 		add_layer(l);
 		update();
+
+#ifdef DBG_CALC
+		enter_digit('9');
+		enter_digit('9');
+		b_plus->on_press_e(std::make_shared<event>(0,0));
+		enter_digit('1');
+		b_eq->on_press_e(std::make_shared<event>(0,0));
+#endif
 	}
+
 	void enter_digit(char digit){
-		if(f){
-			second += digit;
+		if(*current == "0"){
+			current->clear();
+			current->operator=(digit);
 		}else{
-			first += digit;
+			current->push_back(digit);
 		}
-		update_label();
+		update_label(*current);
 	}
-	void add(){
-		eq();
-		f = [this](){
-			double real_first = std::stod(first);
-			double real_second = std::stod(second);
-			real_first+=real_second;
-			first = std::to_string(real_first);
-			second = "0";
-		};
-	}
-	void sub(){
-		eq();
-		f = [this](){
-			double real_first = std::stod(first);
-			double real_second = std::stod(second);
-			real_first-=real_second;
-			first = std::to_string(real_first);
-			second = "0";
-		};
-	}
-	void mul(){
-		eq();
-		f = [this](){
-			double real_first = std::stod(first);
-			double real_second = std::stod(second);
-			real_first*=real_second;
-			first = std::to_string(real_first);
-			second = "0";
-		};
-	}
-	void div(){
-		eq();
-		f = [this](){
-			double real_first = std::stod(first);
-			double real_second = std::stod(second);
-			real_first/=real_second;
-			first = std::to_string(real_first);
-			second = "0";
-		};
-	}
-	void eq(){
-		if(f){
-			return;
-		}
-		f();
-		update_label();
-	}
+
 };
 
 inline void draw_img(std::shared_ptr<element> el){
